@@ -11,7 +11,9 @@ This document outlines the phased development approach for the Navio browser ext
 ### Scope
 
 #### 1.1 Recording System
+
 - **Click Event Capture**
+
   - Listen to click events on any webpage
   - Capture DOM selector using priority strategy:
     1. `data-testid`, `data-id` attributes
@@ -22,6 +24,7 @@ This document outlines the phased development approach for the Navio browser ext
   - Store in `chrome.storage.local`
 
 - **Step Annotation**
+
   - Auto-open modal after each captured action
   - Fields: Step Title (auto-suggested), Description, Presenter Notes
   - Allow editing/deleting steps during recording
@@ -37,7 +40,9 @@ This document outlines the phased development approach for the Navio browser ext
     - "Hide Toolbar" toggle
 
 #### 1.2 Overlay Runtime (Playback)
+
 - **Visual Components**
+
   - **Highlight Box:** 2px solid border with pulse animation around target element
   - **Tooltip:** Positioned card showing step title + description
   - **Presenter Panel:** Fixed right sidebar (320px) with:
@@ -48,6 +53,7 @@ This document outlines the phased development approach for the Navio browser ext
     - Next/Previous navigation buttons
 
 - **Step Execution Logic**
+
   - Load flow from storage
   - Query DOM for each step's selector
   - Render highlight and tooltip when element found
@@ -61,26 +67,29 @@ This document outlines the phased development approach for the Navio browser ext
   - 2-second timeout before showing fallback
 
 #### 1.3 Storage & Export
+
 - **Local Storage**
+
   - Save flows to `chrome.storage.local`
   - Data structure:
+
     ```typescript
     type Flow = {
-      id: string;
-      name: string;
-      createdAt: string;
-      steps: FlowStep[];
-    };
-    
+      id: string
+      name: string
+      createdAt: string
+      steps: FlowStep[]
+    }
+
     type FlowStep = {
-      id: string;
-      selector: string;
-      url: string;
-      title: string;
-      description: string;
-      notes: string; // Private presenter notes
-      order: number;
-    };
+      id: string
+      selector: string
+      url: string
+      title: string
+      description: string
+      notes: string // Private presenter notes
+      order: number
+    }
     ```
 
 - **Import/Export**
@@ -89,6 +98,7 @@ This document outlines the phased development approach for the Navio browser ext
   - List all saved flows in popup
 
 #### 1.4 Extension Popup UI
+
 - **States:**
   - **Idle:** "Start Recording" + "Load Existing Flows" buttons
   - **Recording:** Red dot indicator, step counter, "Pause" + "Finish & Save" buttons
@@ -132,12 +142,15 @@ This document outlines the phased development approach for the Navio browser ext
 ### Scope
 
 #### 2.1 Backend API Integration
+
 - **Authentication**
+
   - User login/signup via web app
   - JWT token storage in extension
   - Secure API communication
 
 - **Flow Sync**
+
   - Upload flows to backend
   - Download team flows
   - Real-time sync across devices
@@ -152,7 +165,9 @@ This document outlines the phased development approach for the Navio browser ext
   - `POST /api/flows/:id/share` - Share with team
 
 #### 2.2 Team Collaboration
+
 - **Flow Sharing**
+
   - Share flows with team members
   - Permission levels (view/edit)
   - Team library of flows
@@ -163,13 +178,16 @@ This document outlines the phased development approach for the Navio browser ext
   - Restore previous versions
 
 #### 2.3 Enhanced Recording
+
 - **Input Event Capture**
+
   - Record text input events
   - Capture field selectors
   - Store input type (text, email, etc.)
   - Security: Never capture passwords
 
 - **Navigation Events**
+
   - Track URL changes
   - Record before/after URLs
   - Handle SPA navigation
@@ -179,6 +197,7 @@ This document outlines the phased development approach for the Navio browser ext
   - "Wait for element" steps
 
 #### 2.4 Flow Management UI
+
 - **Web Dashboard**
   - Browse all flows
   - Search and filter
@@ -210,7 +229,9 @@ This document outlines the phased development approach for the Navio browser ext
 ### Scope
 
 #### 3.1 Branching Flows
+
 - **Branch Points**
+
   - Define decision points in flow
   - Multiple paths from single step
   - Manual branch selection during playback
@@ -222,7 +243,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Path preview
 
 #### 3.2 Demo Data Overrides
+
 - **Data Injection**
+
   - Override displayed data during demo
   - Replace text content in DOM
   - Inject custom values (names, numbers, etc.)
@@ -234,7 +257,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Clear visual indicator of overridden data
 
 #### 3.3 Enhanced Presenter Tools
+
 - **Persona Presets**
+
   - Toggle between customer personas
   - Auto-adjust talking points
   - Customize data overrides per persona
@@ -245,7 +270,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Objection handling tips
 
 #### 3.4 Analytics & Insights
+
 - **Usage Tracking**
+
   - Flow completion rates
   - Step-by-step timing
   - Drop-off points
@@ -280,7 +307,9 @@ This document outlines the phased development approach for the Navio browser ext
 ### Scope
 
 #### 4.1 Smart Recording
+
 - **Auto-Annotation**
+
   - AI-generated step titles
   - Auto-suggested descriptions
   - Context-aware presenter notes
@@ -291,7 +320,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Predictive selector healing
 
 #### 4.2 Auto-Generated Flows
+
 - **Flow Templates**
+
   - Common demo patterns
   - Industry-specific templates
   - One-click flow creation
@@ -302,7 +333,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Auto-create from user journeys
 
 #### 4.3 Real-Time Assistance
+
 - **Live Coaching**
+
   - Real-time objection handling
   - Competitor comparison data
   - Pricing guidance
@@ -313,7 +346,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Adaptive flow routing
 
 #### 4.4 Integration Ecosystem
+
 - **CRM Integration**
+
   - Salesforce, HubSpot sync
   - Auto-log demo activities
   - Pull prospect context
@@ -346,7 +381,9 @@ This document outlines the phased development approach for the Navio browser ext
 ### Scope
 
 #### 5.1 Enterprise Security
+
 - **SSO/SAML**
+
   - Enterprise identity providers
   - Role-based access control (RBAC)
   - Audit logs
@@ -357,7 +394,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Data residency options
 
 #### 5.2 Advanced Administration
+
 - **Team Management**
+
   - Hierarchical teams
   - Flow approval workflows
   - Content governance
@@ -368,7 +407,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Company logo in presenter panel
 
 #### 5.3 Performance & Scale
+
 - **Optimization**
+
   - CDN for flow assets
   - Lazy loading
   - Caching strategies
@@ -379,7 +420,9 @@ This document outlines the phased development approach for the Navio browser ext
   - Disaster recovery
 
 #### 5.4 Advanced Analytics
+
 - **Executive Dashboards**
+
   - Team performance metrics
   - ROI tracking
   - Conversion attribution
@@ -408,12 +451,12 @@ This document outlines the phased development approach for the Navio browser ext
 
 ## Timeline Estimates
 
-| Phase | Duration | Dependencies |
-|-------|----------|--------------|
-| Phase 1 (MVP) | 4-6 weeks | None |
-| Phase 2 (Backend) | 6-8 weeks | Phase 1 complete |
-| Phase 3 (Advanced) | 8-10 weeks | Phase 2 complete |
-| Phase 4 (AI) | 10-12 weeks | Phase 3 complete |
+| Phase                | Duration    | Dependencies     |
+| -------------------- | ----------- | ---------------- |
+| Phase 1 (MVP)        | 4-6 weeks   | None             |
+| Phase 2 (Backend)    | 6-8 weeks   | Phase 1 complete |
+| Phase 3 (Advanced)   | 8-10 weeks  | Phase 2 complete |
+| Phase 4 (AI)         | 10-12 weeks | Phase 3 complete |
 | Phase 5 (Enterprise) | 12-16 weeks | Phase 4 complete |
 
 **Total estimated timeline:** 10-13 months from start to enterprise-ready
@@ -444,39 +487,44 @@ This document outlines the phased development approach for the Navio browser ext
 
 ## Risk Mitigation
 
-| Risk | Mitigation |
-|------|------------|
+| Risk                            | Mitigation                                      |
+| ------------------------------- | ----------------------------------------------- |
 | Selector breakage on UI changes | Multi-strategy selector generation + ML healing |
-| Performance impact on host page | Shadow DOM isolation, debounced events |
-| Security concerns | No password capture, CSP compliance, audit logs |
-| Browser compatibility | Progressive enhancement, feature detection |
-| Scalability | CDN, caching, multi-region deployment |
+| Performance impact on host page | Shadow DOM isolation, debounced events          |
+| Security concerns               | No password capture, CSP compliance, audit logs |
+| Browser compatibility           | Progressive enhancement, feature detection      |
+| Scalability                     | CDN, caching, multi-region deployment           |
 
 ---
 
 ## Success Metrics
 
 ### Phase 1 (MVP)
+
 - 50+ flows recorded by beta users
 - 90%+ playback success rate
 - <5 min time to first flow
 
 ### Phase 2 (Backend)
+
 - 100+ active teams
 - 1,000+ flows in library
 - 95%+ sync reliability
 
 ### Phase 3 (Advanced)
+
 - 30%+ flows use branching
 - 50%+ demos use data overrides
 - 20%+ improvement in demo conversion
 
 ### Phase 4 (AI)
+
 - 80%+ AI annotation accuracy
 - 90%+ selector auto-healing success
 - 40%+ reduction in flow creation time
 
 ### Phase 5 (Enterprise)
+
 - 10+ enterprise customers
 - 99.9%+ uptime
 - SOC 2 certified
@@ -486,12 +534,14 @@ This document outlines the phased development approach for the Navio browser ext
 ## Next Steps
 
 1. **Immediate (Phase 1):**
+
    - Set up Plasmo/WXT project structure
    - Implement click event recorder
    - Build basic overlay runtime
    - Create extension popup UI
 
 2. **Short-term (Phase 2):**
+
    - Design backend API schema
    - Implement authentication
    - Build flow sync mechanism
@@ -503,4 +553,4 @@ This document outlines the phased development approach for the Navio browser ext
 
 ---
 
-*Last updated: 2025-11-29*
+_Last updated: 2025-11-29_

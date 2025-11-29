@@ -3,6 +3,7 @@
 ## The Problem
 
 Sales reps struggle with:
+
 - **Inconsistent demos** - Different reps present different flows, forget steps
 - **Unpredictable environments** - Staging has missing/broken data
 - **Forgetting what to say** - Juggling tabs, notes, slides during demos
@@ -11,12 +12,13 @@ Sales reps struggle with:
 ## The Solution
 
 A browser extension that overlays guidance directly on the real product during live demos:
+
 - Highlights the next UI element to click
 - Shows tooltip explanations for prospects
 - Displays private presenter notes for the rep
 - Walks reps step-by-step through predefined flows
 
-**Key insight:** Guide reps *inside* the real product, not with slides or scripts.
+**Key insight:** Guide reps _inside_ the real product, not with slides or scripts.
 
 ---
 
@@ -27,9 +29,11 @@ Build a **standalone extension** that works without a backend. Focus on proving 
 ## Features to Build
 
 ### 1. Recorder
+
 **Goal:** Capture a demo flow by recording clicks
 
 **Functionality:**
+
 - Start/stop recording from extension popup
 - Listen to click events on the page
 - For each click, capture:
@@ -41,14 +45,17 @@ Build a **standalone extension** that works without a backend. Focus on proving 
 - Allow adding titles and notes to each step after recording
 
 **UI:**
+
 - Simple popup with "Start Recording" / "Stop Recording" button
 - After recording, show list of captured steps
 - Allow editing step titles and notes inline
 
 ### 2. Runtime (Overlay Player)
+
 **Goal:** Play back recorded flows with visual overlays
 
 **Functionality:**
+
 - Select a flow from popup to start
 - Inject overlay UI into the page:
   - **Highlight box** around the current element (using stored selector)
@@ -64,37 +71,41 @@ Build a **standalone extension** that works without a backend. Focus on proving 
 - Auto-scroll to highlighted element
 
 **UI Components:**
+
 - Highlight: 2px solid border with subtle glow
 - Tooltip: Card with step title + description
 - Presenter panel: Floating sidebar (right side, collapsible)
 
 ### 3. Storage & Export
+
 **Goal:** Persist flows locally and allow sharing
 
 **Functionality:**
+
 - Save flows to `chrome.storage.local`
 - Export flow as JSON file
 - Import flow from JSON file
 - List all saved flows in popup
 
 **Data Structure:**
+
 ```typescript
 type Flow = {
-  id: string;
-  name: string;
-  createdAt: string;
-  steps: FlowStep[];
-};
+  id: string
+  name: string
+  createdAt: string
+  steps: FlowStep[]
+}
 
 type FlowStep = {
-  id: string;
-  selector: string;
-  url: string;
-  title: string;
-  description: string;
-  notes: string; // Private presenter notes
-  order: number;
-};
+  id: string
+  selector: string
+  url: string
+  title: string
+  description: string
+  notes: string // Private presenter notes
+  order: number
+}
 ```
 
 ---
@@ -113,6 +124,7 @@ type FlowStep = {
 ## Success Criteria
 
 You have a working MVP when:
+
 1. ✅ You can record a 5-step flow on any website
 2. ✅ You can play it back with visible highlights and tooltips
 3. ✅ You can see presenter notes in the side panel
@@ -124,23 +136,28 @@ You have a working MVP when:
 ## Technical Notes
 
 ### Selector Strategy
+
 Use a robust selector generator that prioritizes:
+
 1. `data-testid` attributes
 2. Unique IDs
 3. Combination of class + nth-child
 4. XPath as fallback
 
 ### URL Matching
+
 - Store full URL during recording
 - During playback, match by pathname (ignore query params initially)
 - Show warning if URL doesn't match
 
 ### Overlay Injection
+
 - Use Shadow DOM to isolate styles
 - Position highlights using `getBoundingClientRect()`
 - Handle scroll events to keep highlights in sync
 
 ### Performance
+
 - Debounce scroll events
 - Use `requestAnimationFrame` for smooth animations
 - Clean up event listeners when flow ends

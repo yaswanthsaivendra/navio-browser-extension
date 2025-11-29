@@ -5,6 +5,7 @@ Chrome extension that provides live overlay guidance for product demos. Sales re
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - Chrome browser
 
@@ -16,6 +17,7 @@ pnpm dev
 ```
 
 Then:
+
 1. Open Chrome → `chrome://extensions`
 2. Enable "Developer mode"
 3. Click "Load unpacked"
@@ -61,6 +63,7 @@ pnpm package
 See [PRODUCT.md](./PRODUCT.md) for full details.
 
 **Core features:**
+
 - ✅ Record clicks and capture DOM selectors
 - ✅ Play back flows with overlay highlights
 - ✅ Show tooltips and presenter notes

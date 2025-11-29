@@ -15,22 +15,23 @@ Match the Navio web app theme (shadcn/ui default):
 
 ```css
 /* Light Mode (Primary) */
---primary: 222.2 47.4% 11.2%;        /* Dark slate */
---primary-foreground: 210 40% 98%;   /* Off white */
+--primary: 222.2 47.4% 11.2%; /* Dark slate */
+--primary-foreground: 210 40% 98%; /* Off white */
 
---accent: 210 40% 96.1%;             /* Light blue-gray */
+--accent: 210 40% 96.1%; /* Light blue-gray */
 --accent-foreground: 222.2 47.4% 11.2%;
 
---border: 214.3 31.8% 91.4%;         /* Subtle gray */
---background: 0 0% 100%;             /* White */
+--border: 214.3 31.8% 91.4%; /* Subtle gray */
+--background: 0 0% 100%; /* White */
 
 /* Semantic Colors */
---highlight: 221 83% 53%;            /* Blue for highlights */
---success: 142 71% 45%;              /* Green */
---warning: 38 92% 50%;               /* Orange */
+--highlight: 221 83% 53%; /* Blue for highlights */
+--success: 142 71% 45%; /* Green */
+--warning: 38 92% 50%; /* Orange */
 ```
 
 ### Usage
+
 - **Highlight box:** `--highlight` with 2px border + subtle shadow
 - **Tooltips:** `--background` with `--border`
 - **Presenter panel:** `--accent` background
@@ -47,6 +48,7 @@ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 ```
 
 **Sizes:**
+
 - Step title: `14px` (semibold)
 - Description: `13px` (regular)
 - Notes: `12px` (regular, muted)
@@ -57,6 +59,7 @@ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 ## Component Specs
 
 ### 1. Highlight Box
+
 ```
 Border: 2px solid var(--highlight)
 Border-radius: 4px
@@ -66,6 +69,7 @@ Z-index: 9998
 ```
 
 ### 2. Tooltip
+
 ```
 Background: var(--background)
 Border: 1px solid var(--border)
@@ -75,17 +79,19 @@ Max-width: 320px
 Box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1)
 Z-index: 9999
 
-Position: 
+Position:
 - Prefer right of element (12px offset)
 - Fallback to left/top/bottom if no space
 - Arrow pointing to element
 ```
 
 **Content:**
+
 - Title (semibold, 14px)
 - Description (regular, 13px, muted)
 
 ### 3. Presenter Panel
+
 ```
 Position: Fixed right side
 Width: 320px
@@ -99,25 +105,26 @@ Sections:
 1. Header
    - Flow name (16px semibold)
    - Close button (top-right)
-   
+
 2. Steps List
    - Scrollable
    - Each step:
      - Number badge
      - Title
      - Active state: primary background
-     
+
 3. Current Step Details
    - Title
    - Description
    - Notes (yellow background, italic)
-   
+
 4. Navigation
    - Previous / Next buttons
    - Keyboard shortcuts hint
 ```
 
 ### 4. Extension Popup
+
 ```
 Width: 360px
 Padding: 16px
@@ -139,20 +146,35 @@ Keep subtle and professional:
 ```css
 /* Highlight pulse */
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
-  50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2);
+  }
 }
 
 /* Tooltip fade in */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Panel slide in */
 @keyframes slideIn {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 ```
 
@@ -180,6 +202,7 @@ Keep subtle and professional:
 ## Icons
 
 Use **Lucide React** (same as web app):
+
 - `Play` - Start flow
 - `Circle` - Recording indicator
 - `ChevronRight/Left` - Navigation

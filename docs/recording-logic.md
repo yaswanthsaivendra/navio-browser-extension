@@ -1,35 +1,40 @@
-# Recording Logic Specification  
-Version: 1.0  
+# Recording Logic Specification
 
-## 1. Action Types Captured  
+Version: 1.0
+
+## 1. Action Types Captured
+
 We capture only the following atomic actions:
 
 1. **Click Event**
    - CSS selector
    - Element path
    - Inner text (if any)
-   - Node type  
+   - Node type
 2. **Navigation (URL Change)**
-   - URL before/after  
+   - URL before/after
 3. **Input Event (optional MVP)**
    - Field selector
    - Input type
 4. **Visibility Trigger**
-   - “Element appeared” or “Element visible”  
+   - “Element appeared” or “Element visible”
 5. **Manual Step**
    - Created by rep, no DOM action required.
 
-## 2. Selector Strategy  
+## 2. Selector Strategy
+
 Priority order:
-1. Stable data attributes → `data-testid`, `data-id`, etc.  
-2. IDs  
-3. Unique class combinations  
+
+1. Stable data attributes → `data-testid`, `data-id`, etc.
+2. IDs
+3. Unique class combinations
 4. Relative XPaths (worst-case fallback)
 
 Record all four and choose the best score.
 
 ## 3. Step Structure (JSON)
-```json
+
+````json
 {
   "stepId": "uuid",
   "type": "click",
@@ -96,13 +101,13 @@ No network calls from content script except to API endpoint.
 # **📄 4. extension-overlay-runtime.md**
 
 ```md
-# Overlay Runtime Specification  
-Version: 1.0  
+# Overlay Runtime Specification
+Version: 1.0
 
-## 1. Purpose  
+## 1. Purpose
 Renders guided overlays on top of the live product UI during demos. The runtime is initiated either through extension popup or via injected script when user chooses a flow.
 
-## 2. Overlay Components  
+## 2. Overlay Components
 1. **Tooltip Component**
    - Title + Description
    - Arrow pointer to target element
@@ -122,30 +127,31 @@ Renders guided overlays on top of the live product UI during demos. The runtime 
    - Suggested talking points
    - Toggle persona (Enterprise / SMB / etc.)
 
-## 3. Step Execution Logic  
-1. Load flow JSON  
+## 3. Step Execution Logic
+1. Load flow JSON
 2. For each step:
-   - Query DOM for selector  
+   - Query DOM for selector
    - If found:
-     - Render highlight  
-     - Render tooltip  
+     - Render highlight
+     - Render tooltip
    - If not found:
-     - Show fallback modal:  
+     - Show fallback modal:
        “Element not found — continue manually?”
-   - Wait for user to click “Next”  
+   - Wait for user to click “Next”
 
-## 4. Selector Monitoring  
-- Observe DOM mutations using MutationObserver  
-- Re-attempt selector match when DOM changes  
+## 4. Selector Monitoring
+- Observe DOM mutations using MutationObserver
+- Re-attempt selector match when DOM changes
 - Timeout after 2 seconds, then show fallback
 
-## 5. Overlay Injection  
-- Append to document body using shadow DOM  
-- Prevent CSS conflicts  
-- Z-index safety layer  
+## 5. Overlay Injection
+- Append to document body using shadow DOM
+- Prevent CSS conflicts
+- Z-index safety layer
 - Detached when flow ends
 
-## 6. Cleanup  
-- Remove all DOM nodes  
-- Unsubscribe listeners  
-- Clear residual state  
+## 6. Cleanup
+- Remove all DOM nodes
+- Unsubscribe listeners
+- Clear residual state
+````
