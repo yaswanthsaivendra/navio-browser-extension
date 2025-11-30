@@ -48,11 +48,51 @@ export async function sendMessageToActiveTab<T = unknown>(
       }
     }
 
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    // Try to get active tab - use multiple strategies
+    let tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+
+    console.warn("[Navio Messaging] Initial tab query", {
+      tabsCount: tabs.length,
+      firstTabId: tabs[0]?.id,
+      firstTabUrl: tabs[0]?.url,
+    })
+
+    // Fallback: if no active tab, try to get the current window's tabs
+    if (!tabs[0]?.id) {
+      console.warn(
+        "[Navio Messaging] No active tab found, trying fallback query"
+      )
+      tabs = await chrome.tabs.query({ currentWindow: true })
+      console.warn("[Navio Messaging] Fallback query result", {
+        tabsCount: tabs.length,
+        tabs: tabs.map((t) => ({ id: t.id, url: t.url, active: t.active })),
+      })
+      // Get the first tab that's not a chrome:// page
+      const validTab = tabs.find(
+        (t) =>
+          t.id &&
+          t.url &&
+          !t.url.startsWith("chrome://") &&
+          !t.url.startsWith("chrome-extension://")
+      )
+      if (validTab) {
+        console.warn("[Navio Messaging] Found valid tab in fallback", {
+          id: validTab.id,
+          url: validTab.url,
+        })
+        tabs = [validTab]
+      }
+    }
+
+    const tab = tabs[0]
     if (!tab || !tab.id) {
+      console.error("[Navio Messaging] No valid tab found", {
+        tabsCount: tabs.length,
+        allTabs: tabs.map((t) => ({ id: t.id, url: t.url })),
+      })
       return {
         success: false,
-        error: "No active tab found",
+        error: "No active tab found. Please open a webpage first.",
       }
     }
 

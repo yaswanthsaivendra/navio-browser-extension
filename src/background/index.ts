@@ -456,19 +456,90 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
       }
 
       // Playback - forward to content script
-      case "START_PLAYBACK":
+      case "START_PLAYBACK": {
+        // Get active tab (popup doesn't have sender.tab)
+        let tabId = sender.tab?.id
+        if (!tabId) {
+          const tabs = await chrome.tabs.query({
+            active: true,
+            currentWindow: true,
+          })
+          if (!tabs[0]?.id) {
+            // Fallback: try to get any tab in current window
+            const allTabs = await chrome.tabs.query({ currentWindow: true })
+            const validTab = allTabs.find(
+              (t) =>
+                t.id &&
+                t.url &&
+                !t.url.startsWith("chrome://") &&
+                !t.url.startsWith("chrome-extension://")
+            )
+            tabId = validTab?.id
+          } else {
+            tabId = tabs[0].id
+          }
+        }
+
+        if (!tabId) {
+          console.error(
+            "[Navio Background] No active tab found for START_PLAYBACK"
+          )
+          return {
+            success: false,
+            error: "No active tab found. Please open a webpage first.",
+          }
+        }
+
+        try {
+          const response = await chrome.tabs.sendMessage(tabId, message)
+          return response as MessageResponse
+        } catch (error) {
+          logError(error, {
+            context: "start-playback",
+            message: message.type,
+            tabId,
+          })
+          return {
+            success: false,
+            error: "Content script not ready. Please refresh the page.",
+          }
+        }
+      }
+
       case "STOP_PLAYBACK":
       case "NEXT_STEP":
       case "PREVIOUS_STEP":
       case "JUMP_TO_STEP":
       case "GET_PLAYBACK_STATE": {
-        // Forward to active tab's content script
-        if (!sender.tab?.id) {
+        // Get active tab (popup doesn't have sender.tab)
+        let tabId = sender.tab?.id
+        if (!tabId) {
+          const tabs = await chrome.tabs.query({
+            active: true,
+            currentWindow: true,
+          })
+          if (!tabs[0]?.id) {
+            // Fallback: try to get any tab in current window
+            const allTabs = await chrome.tabs.query({ currentWindow: true })
+            const validTab = allTabs.find(
+              (t) =>
+                t.id &&
+                t.url &&
+                !t.url.startsWith("chrome://") &&
+                !t.url.startsWith("chrome-extension://")
+            )
+            tabId = validTab?.id
+          } else {
+            tabId = tabs[0].id
+          }
+        }
+
+        if (!tabId) {
           return { success: false, error: "No active tab" }
         }
 
         try {
-          const response = await chrome.tabs.sendMessage(sender.tab.id, message)
+          const response = await chrome.tabs.sendMessage(tabId, message)
           return response as MessageResponse
         } catch (error) {
           logError(error, { context: "forward-message", message: message.type })

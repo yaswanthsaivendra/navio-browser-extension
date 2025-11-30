@@ -1,11 +1,20 @@
 // Content script - runs on web pages
 // This will be used for recording and overlay functionality
 
+import { StrictMode } from "react"
+import { createRoot } from "react-dom/client"
+
+import type { Flow } from "~/types/flows"
 import type { Message, MessageResponse } from "~/types/messages"
 import { logError } from "~/utils/errors"
 import { onMessage, sendMessage } from "~/utils/messaging"
+import { getFlowById } from "~/utils/storage"
 
+import { PresenterPanel } from "./components/PresenterPanel"
+import { Playback } from "./playback"
 import { Recorder } from "./recorder"
+
+import "./components/styles.css"
 
 // Readiness marker - indicates content script is fully loaded and ready
 declare global {
@@ -19,6 +28,11 @@ window.__NAVIO_CONTENT_SCRIPT_READY__ = false
 
 // Initialize recorder
 let recorder: Recorder | null = null
+
+// Initialize playback
+let playback: Playback | null = null
+let presenterPanelRoot: HTMLDivElement | null = null
+let presenterPanelReactRoot: ReturnType<typeof createRoot> | null = null
 
 // Initialize content script
 try {
@@ -183,6 +197,107 @@ try {
             },
           }
 
+        // Playback messages
+        case "START_PLAYBACK": {
+          if (!playback) {
+            playback = new Playback({
+              onStepChanged: (_stepIndex, _step) => {
+                // Update presenter panel if it exists
+                updatePresenterPanel()
+              },
+              onPlaybackStateChanged: (isPlaying) => {
+                if (!isPlaying) {
+                  // Cleanup presenter panel
+                  cleanupPresenterPanel()
+                }
+              },
+              onElementNotFound: (step) => {
+                console.warn(
+                  "[Navio Content] Element not found during playback",
+                  {
+                    selector: step.selector,
+                    explanation: step.explanation,
+                  }
+                )
+              },
+            })
+          }
+
+          // Load flow from storage
+          const flow = await getFlowById(message.flowId)
+          if (!flow) {
+            return { success: false, error: "Flow not found" }
+          }
+
+          // Start playback
+          playback.start(flow)
+
+          // Render presenter panel
+          renderPresenterPanel(flow)
+
+          return { success: true, data: { flowId: flow.id } }
+        }
+
+        case "STOP_PLAYBACK": {
+          if (playback) {
+            playback.stop()
+            playback = null
+          }
+          cleanupPresenterPanel()
+          return { success: true }
+        }
+
+        case "NEXT_STEP": {
+          if (playback) {
+            await playback.next()
+            updatePresenterPanel()
+            return { success: true }
+          }
+          return { success: false, error: "Playback not active" }
+        }
+
+        case "PREVIOUS_STEP": {
+          if (playback) {
+            playback.previous()
+            updatePresenterPanel()
+            return { success: true }
+          }
+          return { success: false, error: "Playback not active" }
+        }
+
+        case "JUMP_TO_STEP": {
+          if (playback) {
+            playback.goToStep(message.stepIndex)
+            updatePresenterPanel()
+            return { success: true }
+          }
+          return { success: false, error: "Playback not active" }
+        }
+
+        case "GET_PLAYBACK_STATE": {
+          if (playback && playback.isActive()) {
+            const flow = playback.getFlow()
+            return {
+              success: true,
+              data: {
+                isPlaying: true,
+                currentStepIndex: playback.getCurrentStepIndex(),
+                flowId: flow?.id,
+                totalSteps: flow?.steps.length || 0,
+              },
+            }
+          }
+          return {
+            success: true,
+            data: {
+              isPlaying: false,
+              currentStepIndex: 0,
+              flowId: null,
+              totalSteps: 0,
+            },
+          }
+        }
+
         default:
           return { success: false, error: "Unknown message type" }
       }
@@ -194,6 +309,90 @@ try {
       }
     }
   })
+
+  // Helper functions for presenter panel
+  function renderPresenterPanel(_flow: Flow): void {
+    // Remove existing panel if any
+    cleanupPresenterPanel()
+
+    // Create container
+    presenterPanelRoot = document.createElement("div")
+    presenterPanelRoot.setAttribute(
+      "data-navio-extension",
+      "presenter-panel-root"
+    )
+    document.body.appendChild(presenterPanelRoot)
+
+    // Create React root
+    presenterPanelReactRoot = createRoot(presenterPanelRoot)
+
+    // Render panel
+    updatePresenterPanel()
+  }
+
+  function updatePresenterPanel(): void {
+    if (
+      !presenterPanelRoot ||
+      !presenterPanelReactRoot ||
+      !playback ||
+      !playback.isActive()
+    ) {
+      return
+    }
+
+    const flow = playback.getFlow()
+    if (!flow) return
+
+    // Re-render with updated step index
+    presenterPanelReactRoot.render(
+      <StrictMode>
+        <PresenterPanel
+          flow={flow}
+          currentStepIndex={playback.getCurrentStepIndex()}
+          onClose={() => {
+            if (playback) {
+              playback.stop()
+              playback = null
+            }
+            cleanupPresenterPanel()
+            // Notify background
+            sendMessage({ type: "STOP_PLAYBACK" }).catch((error) => {
+              logError(error, { context: "stop-playback-on-close" })
+            })
+          }}
+          onNext={async () => {
+            if (playback) {
+              await playback.next()
+              updatePresenterPanel()
+            }
+          }}
+          onPrevious={() => {
+            if (playback) {
+              playback.previous()
+              updatePresenterPanel()
+            }
+          }}
+          onJumpToStep={(index) => {
+            if (playback) {
+              playback.goToStep(index)
+              updatePresenterPanel()
+            }
+          }}
+        />
+      </StrictMode>
+    )
+  }
+
+  function cleanupPresenterPanel(): void {
+    if (presenterPanelReactRoot) {
+      presenterPanelReactRoot.unmount()
+      presenterPanelReactRoot = null
+    }
+    if (presenterPanelRoot) {
+      presenterPanelRoot.remove()
+      presenterPanelRoot = null
+    }
+  }
 
   // Mark as ready after successful initialization
   window.__NAVIO_CONTENT_SCRIPT_READY__ = true
