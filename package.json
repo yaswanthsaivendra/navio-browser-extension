@@ -5,25 +5,27 @@
   "description": "Browser extension for recording and replaying demo flows with live overlay guidance",
   "author": "Yaswanth Sai Vendra",
   "scripts": {
-    "dev": "plasmo dev",
-    "build": "plasmo build",
-    "package": "plasmo package",
-    "lint": "eslint . --ext .ts,.tsx",
-    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "dev": "vite build --watch --mode development || true",
+    "build": "vite build --mode production",
+    "package": "npm run build && cd dist && zip -r ../navio-extension.zip . -x '*.map' '*.tsbuildinfo'",
+    "clean": "rm -rf dist build *.tsbuildinfo",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\"",
     "type-check": "tsc --noEmit",
-    "prepare": "husky",
-    "check-all": "pnpm type-check && pnpm lint && pnpm format:check"
+    "validate": "pnpm type-check && pnpm lint && pnpm format:check",
+    "check-all": "pnpm validate",
+    "prepare": "husky"
   },
   "dependencies": {
-    "plasmo": "0.90.5",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
+    "@crxjs/vite-plugin": "^2.0.0-beta.24",
     "@eslint/js": "^9.39.1",
     "@ianvs/prettier-plugin-sort-imports": "4.1.1",
     "@types/chrome": "0.0.258",
@@ -32,6 +34,7 @@
     "@types/react-dom": "18.2.18",
     "@typescript-eslint/eslint-plugin": "^8.48.0",
     "@typescript-eslint/parser": "^8.48.0",
+    "@vitejs/plugin-react": "^4.2.1",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
@@ -39,12 +42,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "3.2.4",
-    "typescript": "5.3.3"
-  },
-  "manifest": {
-    "host_permissions": [
-      "https://*/*"
-    ]
+    "typescript": "5.3.3",
+    "vite": "^5.0.0"
   },
   "packageManager": "pnpm@10.22.0+sha512.bf049efe995b28f527fd2b41ae0474ce29186f7edcb3bf545087bd61fbbebb2bf75362d1307fda09c2d288e1e499787ac12d4fcb617a974718a6051f2eee741c"
 }

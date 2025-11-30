@@ -14,7 +14,6 @@
   "search.exclude": {
     "**/node_modules": true,
     "**/build": true,
-    "**/.plasmo": true,
     "**/dist": true
   }
 }

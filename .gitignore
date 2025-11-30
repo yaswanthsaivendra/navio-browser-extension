@@ -7,7 +7,7 @@
 .pnp.js
 .yarn/install-state.gz
 
-# Testing
+# Testing (if added later)
 /coverage
 *.lcov
 
@@ -17,8 +17,9 @@ build/
 dist/
 *.tsbuildinfo
 
-# Plasmo
-.plasmo
+# Vite
+.vite
+dist
 
 # Environment variables
 .env

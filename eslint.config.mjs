@@ -20,9 +20,11 @@ export default [
             },
             globals: {
                 chrome: "readonly",
-                browser: true,
-                es2021: true,
-                node: true,
+                browser: "readonly",
+                console: "readonly",
+                document: "readonly",
+                window: "readonly",
+                self: "readonly",
             },
         },
         plugins: {
@@ -69,10 +71,10 @@ export default [
         ignores: [
             "node_modules/**",
             "build/**",
-            ".plasmo/**",
             "dist/**",
             "*.config.js",
             "*.config.mjs",
+            "*.config.ts",
         ],
     },
 ];

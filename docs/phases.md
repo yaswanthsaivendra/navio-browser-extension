@@ -106,7 +106,7 @@ This document outlines the phased development approach for the Navio browser ext
 
 ### Technical Implementation
 
-- **Framework:** Plasmo or WXT
+- **Framework:** Vite + React + TypeScript
 - **UI:** React + TailwindCSS
 - **Language:** TypeScript
 - **Build:** Vite
@@ -535,7 +535,7 @@ This document outlines the phased development approach for the Navio browser ext
 
 1. **Immediate (Phase 1):**
 
-   - Set up Plasmo/WXT project structure
+   - Set up Vite + React project structure
    - Implement click event recorder
    - Build basic overlay runtime
    - Create extension popup UI

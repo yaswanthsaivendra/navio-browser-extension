@@ -40,7 +40,7 @@ extension/
 
 ## Tech Stack
 
-- **Framework:** Plasmo (or WXT)
+- **Framework:** Vite + React + TypeScript
 - **UI:** React + TailwindCSS
 - **Storage:** Chrome Storage API (Phase 1: localStorage)
 - **Build:** TypeScript + Vite
