@@ -37,18 +37,21 @@ Build a **standalone extension** that works without a backend. Focus on proving 
 - Start/stop recording from extension popup
 - Listen to click events on the page
 - For each click, capture:
-  - DOM selector (use `getSelector()` utility)
+  - DOM selector (use priority-based selector strategy)
   - Current URL
   - Element text content
   - Timestamp
-- Store steps in `chrome.storage.local`
-- Allow adding titles and notes to each step after recording
+  - Auto-generate step explanation (60-100 characters)
+  - Auto-number steps sequentially
+- Store steps in `chrome.storage.local` (persists across page navigations)
+- Steps can be edited later after recording is complete
 
 **UI:**
 
-- Simple popup with "Start Recording" / "Stop Recording" button
-- After recording, show list of captured steps
-- Allow editing step titles and notes inline
+- Simple popup with "Start Recording" / "Finish & Save Flow" button
+- Step counter displayed during recording
+- Dialog to enter flow name when saving
+- After recording, show list of saved flows
 
 ### 2. Runtime (Overlay Player)
 
@@ -94,17 +97,28 @@ type Flow = {
   id: string
   name: string
   createdAt: string
+  updatedAt?: string
   steps: FlowStep[]
+  meta?: {
+    description?: string
+    tags?: string[]
+  }
 }
 
 type FlowStep = {
   id: string
+  type: "click" | "navigation" | "input" | "visibility" | "manual"
   selector: string
   url: string
-  title: string
-  description: string
-  notes: string // Private presenter notes
+  explanation: string // Single field for step description (60-100 characters)
   order: number
+  meta?: {
+    elementText?: string
+    nodeType?: string
+    timestamp?: string
+    screenshotThumb?: string
+    createdAt?: string
+  }
 }
 ```
 

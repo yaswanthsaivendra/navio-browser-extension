@@ -25,19 +25,15 @@ This document outlines the phased development approach for the Navio browser ext
 
 - **Step Annotation**
 
-  - Auto-open modal after each captured action
-  - Fields: Step Title (auto-suggested), Description, Presenter Notes
-  - Allow editing/deleting steps during recording
+  - Auto-generate step explanation (60-100 characters) for each captured action
+  - Auto-number steps sequentially (Step 1, Step 2, etc.)
+  - Steps can be edited later after recording is complete
   - Manual step creation option
 
 - **Recording Controls**
   - Start/Stop recording from extension popup
-  - Floating on-screen toolbar with:
-    - Step counter
-    - "Add Manual Step" button
-    - "Undo Last Step" button
-    - "Finish Recording" button
-    - "Hide Toolbar" toggle
+  - Step counter displayed in popup
+  - Recording persists across page navigations
 
 #### 1.2 Overlay Runtime (Playback)
 
@@ -83,12 +79,18 @@ This document outlines the phased development approach for the Navio browser ext
 
     type FlowStep = {
       id: string
+      type: "click" | "navigation" | "input" | "visibility" | "manual"
       selector: string
       url: string
-      title: string
-      description: string
-      notes: string // Private presenter notes
+      explanation: string // Single field for step description (60-100 characters)
       order: number
+      meta?: {
+        elementText?: string
+        nodeType?: string
+        timestamp?: string
+        screenshotThumb?: string
+        createdAt?: string
+      }
     }
     ```
 

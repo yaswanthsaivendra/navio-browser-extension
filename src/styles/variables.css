@@ -1,0 +1,141 @@
+/**
+ * Shared CSS Variables - Navio Design System
+ *
+ * This file contains all CSS custom properties (variables) used throughout the extension.
+ * Import this file in both popup and content script stylesheets to maintain consistency.
+ *
+ * Colors are based on the Navio Design System as defined in docs/extension-repo/THEME.md
+ * Using OKLCH color space for the warm & earthy palette.
+ *
+ * Tailwind CSS v4 uses @theme to generate utility classes from these color definitions.
+ */
+
+/* Define theme colors for Tailwind CSS v4 to generate utility classes */
+@theme {
+    /* Core Colors - From Navio Design System (OKLCH) */
+    --color-background: oklch(0.98 0.02 95);
+    /* Cream/Sand */
+    --color-foreground: oklch(0.25 0.02 95);
+    /* Dark warm gray */
+
+    /* Primary Colors - Deep Forest Green */
+    --color-primary: oklch(0.45 0.12 140);
+    --color-primary-foreground: oklch(0.98 0.02 95);
+    /* Cream/Sand */
+
+    /* Secondary Colors - Warm Beige */
+    --color-secondary: oklch(0.92 0.03 95);
+    --color-secondary-foreground: oklch(0.25 0.02 95);
+
+    /* Accent Colors - Terracotta */
+    --color-accent: oklch(0.65 0.18 45);
+    --color-accent-foreground: oklch(0.98 0.02 95);
+
+    /* Muted Colors */
+    --color-muted: oklch(0.95 0.02 95);
+    --color-muted-foreground: oklch(0.55 0.04 95);
+
+    /* Destructive Colors - Warm red (for error states, not in THEME.md but needed for shadcn) */
+    --color-destructive: oklch(0.55 0.18 20);
+    --color-destructive-foreground: oklch(0.98 0.02 95);
+
+    /* Border & Input - Subtle warm gray */
+    --color-border: oklch(0.9 0.02 95);
+    --color-input: oklch(0.9 0.02 95);
+
+    /* Ring (Focus) - Use highlight color for focus rings */
+    --color-ring: oklch(0.55 0.18 220);
+
+    /* Card & Popover */
+    --color-card: oklch(0.98 0.02 95);
+    --color-card-foreground: oklch(0.25 0.02 95);
+    --color-popover: oklch(0.98 0.02 95);
+    --color-popover-foreground: oklch(0.25 0.02 95);
+
+    /* Semantic Colors - From Navio Design System */
+    --color-highlight: oklch(0.55 0.18 220);
+    /* Blue for highlights */
+    --color-success: oklch(0.55 0.15 140);
+    /* Green - matches primary hue */
+    --color-warning: oklch(0.75 0.15 60);
+    /* Warm orange/yellow */
+
+    /* Border Radius - Base 10px (0.625rem) as per THEME.md */
+    --radius: 0.625rem;
+    /* 10px base */
+    --radius-sm: calc(var(--radius) - 4px);
+    /* 6px */
+    --radius-md: calc(var(--radius) - 2px);
+    /* 8px */
+    --radius-lg: var(--radius);
+    /* 10px */
+    --radius-xl: calc(var(--radius) + 4px);
+    /* 14px */
+
+    /* Font Families - Geist fonts with system fallbacks */
+    --font-geist-sans: "Geist Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-geist-mono: "Geist Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", monospace;
+}
+
+/* Keep CSS variables for direct use (backward compatibility and direct CSS usage) */
+@layer base {
+    :root {
+        /* Core Colors - From Navio Design System (OKLCH) */
+        --background: oklch(0.98 0.02 95);
+        --foreground: oklch(0.25 0.02 95);
+
+        /* Primary Colors - Deep Forest Green */
+        --primary: oklch(0.45 0.12 140);
+        --primary-foreground: oklch(0.98 0.02 95);
+
+        /* Secondary Colors - Warm Beige */
+        --secondary: oklch(0.92 0.03 95);
+        --secondary-foreground: oklch(0.25 0.02 95);
+
+        /* Accent Colors - Terracotta */
+        --accent: oklch(0.65 0.18 45);
+        --accent-foreground: oklch(0.98 0.02 95);
+
+        /* Muted Colors */
+        --muted: oklch(0.95 0.02 95);
+        --muted-foreground: oklch(0.55 0.04 95);
+
+        /* Destructive Colors - Warm red */
+        --destructive: oklch(0.55 0.18 20);
+        --destructive-foreground: oklch(0.98 0.02 95);
+
+        /* Border & Input - Subtle warm gray */
+        --border: oklch(0.9 0.02 95);
+        --input: oklch(0.9 0.02 95);
+
+        /* Ring (Focus) - Use highlight color */
+        --ring: oklch(0.55 0.18 220);
+
+        /* Card & Popover */
+        --card: oklch(0.98 0.02 95);
+        --card-foreground: oklch(0.25 0.02 95);
+        --popover: oklch(0.98 0.02 95);
+        --popover-foreground: oklch(0.25 0.02 95);
+
+        /* Semantic Colors - From Navio Design System */
+        --highlight: oklch(0.55 0.18 220);
+        --success: oklch(0.55 0.15 140);
+        --warning: oklch(0.75 0.15 60);
+
+        /* Border Radius - Base 10px (0.625rem) as per THEME.md */
+        --radius: 0.625rem;
+        /* 10px base */
+        --radius-sm: calc(var(--radius) - 4px);
+        /* 6px */
+        --radius-md: calc(var(--radius) - 2px);
+        /* 8px */
+        --radius-lg: var(--radius);
+        /* 10px */
+        --radius-xl: calc(var(--radius) + 4px);
+        /* 14px */
+
+        /* Font Families - Geist fonts with system fallbacks */
+        --font-geist-sans: "Geist Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-geist-mono: "Geist Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", monospace;
+    }
+}

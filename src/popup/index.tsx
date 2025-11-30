@@ -6,6 +6,8 @@ import { logError } from "~/utils/errors"
 import { ErrorBoundary } from "./ErrorBoundary"
 import Popup from "./Popup"
 
+import "./index.css"
+
 function init(): void {
   const rootContainer = document.querySelector("#root")
   if (!rootContainer) {

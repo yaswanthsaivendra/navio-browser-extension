@@ -34,51 +34,49 @@ Record all four and choose the best score.
 
 ## 3. Step Structure (JSON)
 
-````json
+```json
 {
-  "stepId": "uuid",
+  "id": "uuid",
   "type": "click",
   "selector": "#settings-btn",
-  "pageUrl": "https://app.com/dashboard",
-  "title": "Open Settings",
-  "description": "This is where you configure user preferences.",
-  "presenterNotes": "Mention our new RBAC system.",
+  "url": "https://app.com/dashboard",
+  "explanation": "Click Settings button to open preferences",
+  "order": 1,
   "meta": {
-    "screenshotThumb": "",
-    "createdAt": ""
+    "elementText": "Settings",
+    "nodeType": "button",
+    "timestamp": "2025-01-15T10:30:00Z",
+    "createdAt": "2025-01-15T10:30:00Z"
   }
 }
-4. Recording Flow
+```
 
-User clicks “Start Recording”
+## 4. Recording Flow
+
+User clicks "Start Recording"
 
 Content script attaches global listeners:
 
-click
-
-input
-
-DOM change
-
-navigation
+- click events
+- navigation events (URL changes)
+- input events (optional)
+- visibility triggers (optional)
 
 On each captured event:
 
-Detect event type
+1. Detect event type
+2. Extract selector using priority strategy
+3. Generate auto-explanation (e.g., "Step 1: Click Settings button")
+4. Auto-number step based on current step count
+5. Send step immediately to background script for persistence
+6. Recording continues across page navigations
 
-Extract selector
+On "Finish Recording":
 
-Compute diff from last step
-
-Open annotation modal
-
-Save step in memory until finalization
-
-On “Finish Recording”:
-
-Persist flow to backend
-
-Reset listeners
+1. Collect all accumulated steps from background
+2. Show dialog to enter flow name
+3. Persist flow to chrome.storage.local
+4. Reset listeners
 
 5. Error Handling
 
@@ -96,28 +94,32 @@ Ignore events from iframes (unless allowlist set).
 
 No network calls from content script except to API endpoint.
 
-
-
 # **📄 4. extension-overlay-runtime.md**
 
 ```md
 # Overlay Runtime Specification
+
 Version: 1.0
 
 ## 1. Purpose
+
 Renders guided overlays on top of the live product UI during demos. The runtime is initiated either through extension popup or via injected script when user chooses a flow.
 
 ## 2. Overlay Components
+
 1. **Tooltip Component**
+
    - Title + Description
    - Arrow pointer to target element
    - Smart position (avoid off-screen)
 
 2. **Highlight Component**
+
    - Animated glowing rectangle around target
    - Resize on DOM resize events
 
 3. **Step Navigator**
+
    - Next / Previous / Jump-to-step
    - Step counter
    - Branch selector
@@ -128,6 +130,7 @@ Renders guided overlays on top of the live product UI during demos. The runtime 
    - Toggle persona (Enterprise / SMB / etc.)
 
 ## 3. Step Execution Logic
+
 1. Load flow JSON
 2. For each step:
    - Query DOM for selector
@@ -140,18 +143,21 @@ Renders guided overlays on top of the live product UI during demos. The runtime 
    - Wait for user to click “Next”
 
 ## 4. Selector Monitoring
+
 - Observe DOM mutations using MutationObserver
 - Re-attempt selector match when DOM changes
 - Timeout after 2 seconds, then show fallback
 
 ## 5. Overlay Injection
+
 - Append to document body using shadow DOM
 - Prevent CSS conflicts
 - Z-index safety layer
 - Detached when flow ends
 
 ## 6. Cleanup
+
 - Remove all DOM nodes
 - Unsubscribe listeners
 - Clear residual state
-````
+```

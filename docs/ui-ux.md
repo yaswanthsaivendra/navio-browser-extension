@@ -26,30 +26,24 @@ When clicking the extension icon:
    - Button: “Start Guided Demo”
    - Button: “Open Editor”
 
-## 2. On-Screen Recorder Toolbar (Injected)
+## 2. Recording UI
 
-A small floating toolbar injected in the UI during recording.
+During recording, the extension popup shows:
 
-### Toolbar Elements:
+- Red dot indicator + "Recording... Step X" text
+- "Finish & Save Flow" button
+- Step counter updates in real-time
 
-- Step counter (e.g., “Step 3”)
-- “Add Manual Step”
-- “Undo Last Step”
-- “Finish Recording”
-- “Hide Toolbar”
+No on-screen toolbar is displayed during recording to minimize interference.
 
-Toolbar automatically sticks to top-right.
+## 3. Step Annotation
 
-## 3. Step Annotation Modal
+Steps are automatically annotated during recording:
 
-After each captured action, auto-open a modal (non-blocking option available).
-
-Fields:
-
-- Step Title (auto-suggested: "Click Settings", etc.)
-- Step Description (short text)
-- Optional Presenter Notes (private)
-- Next Button: Save
+- Auto-generated explanation (60-100 characters)
+- Auto-numbered sequentially (Step 1, Step 2, etc.)
+- Based on element text, selector, and action type
+- Steps can be edited later after recording is complete
 
 ## 4. Playback Overlay UI
 
@@ -58,8 +52,7 @@ During live demo playback:
 ### Elements:
 
 - A tooltip box next to the target element:
-  - Step Title
-  - Description
+  - Step explanation (single field)
 - Highlight ring around element
 - Floating step navigator:
   - “Next Step”

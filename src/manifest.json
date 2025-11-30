@@ -3,8 +3,8 @@
   "name": "Navio extension",
   "version": "0.0.1",
   "description": "Browser extension for recording and replaying demo flows with live overlay guidance",
-  "permissions": ["storage", "activeTab"],
-  "optional_permissions": ["https://*/*"],
+  "permissions": ["storage", "activeTab", "scripting"],
+  "optional_host_permissions": ["https://*/*"],
   "action": {
     "default_popup": "src/popup/index.html",
     "default_icon": {

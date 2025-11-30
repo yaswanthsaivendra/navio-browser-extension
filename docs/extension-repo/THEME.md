@@ -11,23 +11,34 @@
 
 ## Color Palette
 
-Match the Navio web app theme (shadcn/ui default):
+Match the Navio web app theme (Warm & Earthy Palette using OKLCH):
 
 ```css
 /* Light Mode (Primary) */
---primary: 222.2 47.4% 11.2%; /* Dark slate */
---primary-foreground: 210 40% 98%; /* Off white */
+--primary: oklch(0.45 0.12 140); /* Deep Forest Green */
+--primary-foreground: oklch(0.98 0.02 95); /* Cream/Sand */
 
---accent: 210 40% 96.1%; /* Light blue-gray */
---accent-foreground: 222.2 47.4% 11.2%;
+--accent: oklch(0.65 0.18 45); /* Terracotta */
+--accent-foreground: oklch(0.98 0.02 95);
 
---border: 214.3 31.8% 91.4%; /* Subtle gray */
---background: 0 0% 100%; /* White */
+--border: oklch(0.9 0.02 95); /* Subtle warm gray */
+--background: oklch(0.98 0.02 95); /* Cream/Sand */
 
-/* Semantic Colors */
---highlight: 221 83% 53%; /* Blue for highlights */
---success: 142 71% 45%; /* Green */
---warning: 38 92% 50%; /* Orange */
+--secondary: oklch(0.92 0.03 95); /* Warm Beige */
+--secondary-foreground: oklch(0.25 0.02 95);
+
+--muted: oklch(0.95 0.02 95);
+--muted-foreground: oklch(0.55 0.04 95);
+
+--card: oklch(0.98 0.02 95);
+--card-foreground: oklch(0.25 0.02 95);
+
+/* Semantic Colors (for extension overlays) */
+--highlight: oklch(
+  0.55 0.18 220
+); /* Blue for highlights - complements warm palette */
+--success: oklch(0.55 0.15 140); /* Green - matches primary hue */
+--warning: oklch(0.75 0.15 60); /* Warm orange/yellow */
 ```
 
 ### Usage
@@ -41,11 +52,24 @@ Match the Navio web app theme (shadcn/ui default):
 
 ## Typography
 
-Use system fonts for performance:
+Match the Navio web app fonts (Geist from Google Fonts):
 
 ```css
-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+/* Sans-serif (primary) */
+font-family:
+  var(--font-geist-sans),
+  -apple-system,
+  BlinkMacSystemFont,
+  "Segoe UI",
+  Roboto,
+  sans-serif;
+
+/* Monospace (for code/technical content) */
+font-family: var(--font-geist-mono), "SF Mono", Monaco, "Cascadia Code",
+  "Roboto Mono", monospace;
 ```
+
+**Note:** The extension should use Geist fonts when possible. If loading external fonts is not feasible in the extension context, fall back to system fonts for performance.
 
 **Sizes:**
 
@@ -62,8 +86,8 @@ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
 ```
 Border: 2px solid var(--highlight)
-Border-radius: 4px
-Box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1)
+Border-radius: var(--radius-md) /* ~8px, matches web app */
+Box-shadow: 0 0 0 4px oklch(0.55 0.18 220 / 0.1)
 Animation: Subtle pulse (1.5s ease-in-out infinite)
 Z-index: 9998
 ```
@@ -73,10 +97,10 @@ Z-index: 9998
 ```
 Background: var(--background)
 Border: 1px solid var(--border)
-Border-radius: 8px
+Border-radius: var(--radius-lg) /* 10px, matches web app */
 Padding: 12px 16px
 Max-width: 320px
-Box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1)
+Box-shadow: 0 4px 12px oklch(0 0 0 / 0.1)
 Z-index: 9999
 
 Position:
@@ -88,7 +112,7 @@ Position:
 **Content:**
 
 - Title (semibold, 14px)
-- Description (regular, 13px, muted)
+- Description (regular, 13px, muted using `--muted-foreground`)
 
 ### 3. Presenter Panel
 
@@ -96,9 +120,9 @@ Position:
 Position: Fixed right side
 Width: 320px
 Height: 100vh
-Background: var(--accent)
+Background: var(--accent) /* Terracotta background */
 Border-left: 1px solid var(--border)
-Box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05)
+Box-shadow: -2px 0 8px oklch(0 0 0 / 0.05)
 Z-index: 9997
 
 Sections:
@@ -148,10 +172,10 @@ Keep subtle and professional:
 @keyframes pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 4px oklch(0.55 0.18 220 / 0.1);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 0 8px oklch(0.55 0.18 220 / 0.2);
   }
 }
 
@@ -177,6 +201,26 @@ Keep subtle and professional:
   }
 }
 ```
+
+---
+
+## Border Radius
+
+Match the web app's border radius system:
+
+```css
+--radius: 0.625rem; /* 10px base */
+--radius-sm: calc(var(--radius) - 4px); /* 6px */
+--radius-md: calc(var(--radius) - 2px); /* 8px */
+--radius-lg: var(--radius); /* 10px */
+--radius-xl: calc(var(--radius) + 4px); /* 14px */
+```
+
+**Usage:**
+
+- Cards, panels: `var(--radius-lg)` or `var(--radius-xl)`
+- Buttons, inputs: `var(--radius-md)`
+- Small badges: `var(--radius-sm)`
 
 ---
 

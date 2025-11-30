@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "../../styles/variables.css";
+
+@layer base {
+    * {
+        font-family: var(--font-geist-sans);
+    }
+
+    [data-navio-extension] {
+        background-color: var(--background);
+        color: var(--foreground);
+    }
+}
