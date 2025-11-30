@@ -3,6 +3,7 @@ import type { FlowStep } from "~/types/flows"
 import type { Message, MessageResponse } from "~/types/messages"
 import type { RecordingSession } from "~/types/recording"
 import { logError } from "~/utils/errors"
+import { logger } from "~/utils/logger"
 import { onMessage } from "~/utils/messaging"
 import {
   deleteFlow,
@@ -13,7 +14,7 @@ import {
   saveFlow,
 } from "~/utils/storage"
 
-console.warn("[Navio Background] Background script loaded")
+logger.info("Background script loaded")
 
 // Recording session state (persists across page navigations)
 let recordingSession: RecordingSession | null = null
@@ -29,14 +30,14 @@ async function saveRecordingSession(
   try {
     if (session) {
       await chrome.storage.local.set({ [RECORDING_SESSION_KEY]: session })
-      console.warn("[Navio Background] Saved recording session", {
+      logger.debug("Saved recording session", {
         state: session.state,
         stepCount: session.steps.length,
         tabId: session.tabId,
       })
     } else {
       await chrome.storage.local.remove(RECORDING_SESSION_KEY)
-      console.warn("[Navio Background] Cleared recording session")
+      logger.debug("Cleared recording session")
     }
   } catch (error) {
     logError(error, { context: "save-recording-session" })
@@ -53,7 +54,7 @@ async function loadRecordingSession(): Promise<RecordingSession | null> {
       | RecordingSession
       | undefined
     if (session) {
-      console.warn("[Navio Background] Loaded recording session from storage", {
+      logger.debug("Loaded recording session from storage", {
         state: session.state,
         stepCount: session.steps.length,
         tabId: session.tabId,
@@ -72,7 +73,7 @@ loadRecordingSession()
   .then((session) => {
     if (session) {
       recordingSession = session
-      console.warn("[Navio Background] Restored recording session on startup")
+      logger.debug("Restored recording session on startup")
     }
   })
   .catch((error) => {
@@ -82,16 +83,18 @@ loadRecordingSession()
 // Listen for extension installation
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
-    console.warn("Navio extension installed")
+    logger.info("Extension installed")
     // Initialize default storage, request permissions, etc.
   } else if (details.reason === "update") {
-    console.warn("Navio extension updated", details.previousVersion)
+    logger.info("Extension updated", {
+      previousVersion: details.previousVersion,
+    })
   }
 })
 
 // Handle errors
 chrome.runtime.onStartup.addListener(() => {
-  console.warn("Navio extension started")
+  logger.info("Extension started")
 })
 
 // Error handling for unhandled errors
@@ -171,7 +174,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
           tabId,
         }
 
-        console.warn("[Navio Background] START_RECORDING - Created session", {
+        logger.debug("START_RECORDING - Created session", {
           tabId,
           sessionState: recordingSession.state,
         })
@@ -181,12 +184,11 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
 
         // Forward to content script to start local recording
         try {
-          console.warn(
-            "[Navio Background] Forwarding START_RECORDING to content script",
-            { tabId }
-          )
+          logger.debug("Forwarding START_RECORDING to content script", {
+            tabId,
+          })
           const response = await chrome.tabs.sendMessage(tabId, message)
-          console.warn("[Navio Background] Content script response", {
+          logger.debug("Content script response", {
             success: response.success,
           })
           return response as MessageResponse
@@ -197,10 +199,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
             tabId,
           })
           // Even if content script fails, keep the session (it will auto-resume on next page)
-          console.warn(
-            "[Navio Background] Content script not ready, but session saved",
-            { tabId }
-          )
+          logger.debug("Content script not ready, but session saved", { tabId })
           return {
             success: true, // Return success so popup doesn't show error
             data: { state: "recording" },
@@ -209,70 +208,35 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
       }
 
       case "STOP_RECORDING": {
-        // Get final steps from content script and return them
+        // Get tab ID
         const tabId = sender.tab?.id || recordingSession?.tabId
         if (!tabId) {
           return { success: false, error: "No active tab" }
         }
 
-        try {
-          const response = await chrome.tabs.sendMessage(tabId, message)
-          if (response.success && response.data) {
-            // Merge any final steps from content script with background steps
-            const contentSteps = (response.data as { steps: FlowStep[] }).steps
-            if (recordingSession) {
-              // Combine steps (background has accumulated steps, content might have latest)
-              const allSteps = [...recordingSession.steps, ...contentSteps]
-              // Remove duplicates by ID
-              const uniqueSteps = Array.from(
-                new Map(allSteps.map((step) => [step.id, step])).values()
-              )
-              recordingSession = null // Clear session
-              await saveRecordingSession(null) // Clear from storage
-              console.warn(
-                "[Navio Background] STOP_RECORDING - Returned steps",
-                { stepCount: uniqueSteps.length }
-              )
-              return { success: true, data: { steps: uniqueSteps } }
-            }
-            recordingSession = null
-            await saveRecordingSession(null)
-            return response
-          }
-          // If content script failed, return background steps
-          if (recordingSession) {
-            const steps = [...recordingSession.steps]
-            recordingSession = null
-            await saveRecordingSession(null)
-            console.warn(
-              "[Navio Background] STOP_RECORDING - Content script failed, returned background steps",
-              {
-                stepCount: steps.length,
-              }
-            )
-            return { success: true, data: { steps } }
-          }
-          return response
-        } catch (error) {
-          // If content script not available, return background steps
-          if (recordingSession) {
-            const steps = [...recordingSession.steps]
-            recordingSession = null
-            await saveRecordingSession(null)
-            console.warn(
-              "[Navio Background] STOP_RECORDING - Exception, returned background steps",
-              {
-                stepCount: steps.length,
-              }
-            )
-            return { success: true, data: { steps } }
-          }
-          logError(error, { context: "stop-recording", message: message.type })
-          return {
-            success: false,
-            error: "Failed to stop recording",
-          }
+        // Check if we have a recording session
+        if (!recordingSession) {
+          return { success: false, error: "No active recording session" }
         }
+
+        // Tell content script to stop (best effort, don't wait for response)
+        try {
+          await chrome.tabs.sendMessage(tabId, message)
+        } catch {
+          // Content script might not be available, that's ok
+          logger.debug("Content script not available during STOP_RECORDING")
+        }
+
+        // Return steps from background (single source of truth)
+        const steps = [...recordingSession.steps]
+        recordingSession = null
+        await saveRecordingSession(null)
+
+        logger.debug("STOP_RECORDING - Returned steps", {
+          stepCount: steps.length,
+        })
+
+        return { success: true, data: { steps } }
       }
 
       case "CAPTURE_CLICK": {
@@ -296,7 +260,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
           step.order = recordingSession.steps.length
           recordingSession.steps.push(step)
           recordingSession.currentStepIndex = recordingSession.steps.length - 1
-          console.warn("[Navio Background] ADD_STEP - Added step", {
+          logger.debug("ADD_STEP - Added step", {
             stepId: step.id,
             explanation: step.explanation.substring(0, 50),
             order: step.order,
@@ -306,7 +270,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
           await saveRecordingSession(recordingSession)
           return { success: true }
         }
-        console.warn("[Navio Background] ADD_STEP - No active session", {
+        logger.debug("ADD_STEP - No active session", {
           hasSession: !!recordingSession,
           sessionState: recordingSession?.state,
         })
@@ -321,10 +285,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
             stepCount: recordingSession.steps.length,
             state: recordingSession.state,
           }
-          console.warn(
-            "[Navio Background] GET_RECORDING_STATE - Session exists",
-            state
-          )
+          logger.debug("GET_RECORDING_STATE - Session exists", state)
           return {
             success: true,
             data: state,
@@ -334,14 +295,11 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
         const restoredSession = await loadRecordingSession()
         if (restoredSession) {
           recordingSession = restoredSession
-          console.warn(
-            "[Navio Background] GET_RECORDING_STATE - Restored from storage",
-            {
-              isRecording: restoredSession.state === "recording",
-              stepCount: restoredSession.steps.length,
-              state: restoredSession.state,
-            }
-          )
+          logger.debug("GET_RECORDING_STATE - Restored from storage", {
+            isRecording: restoredSession.state === "recording",
+            stepCount: restoredSession.steps.length,
+            state: restoredSession.state,
+          })
           return {
             success: true,
             data: {
@@ -353,17 +311,19 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
         }
         // Fallback: check content script
         const tabId = sender.tab?.id
-        console.warn(
-          "[Navio Background] GET_RECORDING_STATE - No session, checking content script",
-          { tabId }
+        logger.debug(
+          "GET_RECORDING_STATE - No session, checking content script",
+          {
+            tabId,
+          }
         )
         if (tabId) {
           try {
             const response = await chrome.tabs.sendMessage(tabId, message)
             return response as MessageResponse
           } catch {
-            console.warn(
-              "[Navio Background] GET_RECORDING_STATE - Content script not available, returning idle"
+            logger.debug(
+              "GET_RECORDING_STATE - Content script not available, returning idle"
             )
             return {
               success: true,
@@ -375,9 +335,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
             }
           }
         }
-        console.warn(
-          "[Navio Background] GET_RECORDING_STATE - No session, no tab, returning idle"
-        )
+        logger.debug("GET_RECORDING_STATE - No session, no tab, returning idle")
         return {
           success: true,
           data: {
@@ -395,7 +353,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
           recordingSession.state =
             message.type === "PAUSE_RECORDING" ? "paused" : "recording"
           await saveRecordingSession(recordingSession)
-          console.warn("[Navio Background] Updated session state", {
+          logger.debug("Updated session state", {
             newState: recordingSession.state,
             stepCount: recordingSession.steps.length,
           })
@@ -441,7 +399,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
               recordingSession.steps.length - 1
             )
             await saveRecordingSession(recordingSession)
-            console.warn("[Navio Background] UNDO_LAST_STEP - Removed step", {
+            logger.debug("UNDO_LAST_STEP - Removed step", {
               remainingSteps: recordingSession.steps.length,
             })
           }
@@ -481,9 +439,7 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
         }
 
         if (!tabId) {
-          console.error(
-            "[Navio Background] No active tab found for START_PLAYBACK"
-          )
+          logger.error("No active tab found for START_PLAYBACK")
           return {
             success: false,
             error: "No active tab found. Please open a webpage first.",

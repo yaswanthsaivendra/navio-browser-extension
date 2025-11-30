@@ -149,9 +149,7 @@ try {
             url: window.location.href,
           })
           recorder.start()
-          console.warn("[Navio Content] Recorder started", {
-            stepCount: recorder.getSteps().length,
-          })
+          console.warn("[Navio Content] Recorder started")
           return { success: true, data: { state: "recording" } }
 
         case "STOP_RECORDING": {
@@ -169,31 +167,20 @@ try {
 
         case "ADD_MANUAL_STEP": {
           recorder.addManualStep(message.step.explanation || "")
-          // Get the last step and send to background
-          const steps = recorder.getSteps()
-          const lastStep = steps[steps.length - 1]
-          if (lastStep) {
-            sendMessage({
-              type: "ADD_STEP",
-              step: lastStep,
-            }).catch((error) => {
-              logError(error, { context: "add-manual-step-to-background" })
-            })
-          }
           return { success: true }
         }
 
         case "UNDO_LAST_STEP": {
-          const removedStep = recorder.undoLastStep()
-          return { success: true, data: { step: removedStep } }
+          // Undo is now handled by background script
+          return { success: true }
         }
 
         case "GET_RECORDING_STATE":
           return {
             success: true,
             data: {
-              isRecording: recorder.getSteps().length > 0,
-              stepCount: recorder.getSteps().length,
+              isRecording: recorder ? true : false,
+              stepCount: 0, // Background manages step count now
             },
           }
 

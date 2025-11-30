@@ -6,6 +6,7 @@
 import type { Message, MessageResponse } from "~/types/messages"
 
 import { logError } from "./errors"
+import { logger } from "./logger"
 
 /**
  * Send a message and wait for response
@@ -51,7 +52,7 @@ export async function sendMessageToActiveTab<T = unknown>(
     // Try to get active tab - use multiple strategies
     let tabs = await chrome.tabs.query({ active: true, currentWindow: true })
 
-    console.warn("[Navio Messaging] Initial tab query", {
+    logger.debug("Initial tab query", {
       tabsCount: tabs.length,
       firstTabId: tabs[0]?.id,
       firstTabUrl: tabs[0]?.url,
@@ -59,11 +60,9 @@ export async function sendMessageToActiveTab<T = unknown>(
 
     // Fallback: if no active tab, try to get the current window's tabs
     if (!tabs[0]?.id) {
-      console.warn(
-        "[Navio Messaging] No active tab found, trying fallback query"
-      )
+      logger.debug("No active tab found, trying fallback query")
       tabs = await chrome.tabs.query({ currentWindow: true })
-      console.warn("[Navio Messaging] Fallback query result", {
+      logger.debug("Fallback query result", {
         tabsCount: tabs.length,
         tabs: tabs.map((t) => ({ id: t.id, url: t.url, active: t.active })),
       })
@@ -76,7 +75,7 @@ export async function sendMessageToActiveTab<T = unknown>(
           !t.url.startsWith("chrome-extension://")
       )
       if (validTab) {
-        console.warn("[Navio Messaging] Found valid tab in fallback", {
+        logger.debug("Found valid tab in fallback", {
           id: validTab.id,
           url: validTab.url,
         })
@@ -86,7 +85,7 @@ export async function sendMessageToActiveTab<T = unknown>(
 
     const tab = tabs[0]
     if (!tab || !tab.id) {
-      console.error("[Navio Messaging] No valid tab found", {
+      logger.error("No valid tab found", {
         tabsCount: tabs.length,
         allTabs: tabs.map((t) => ({ id: t.id, url: t.url })),
       })

@@ -20,7 +20,6 @@ export interface RecorderConfig {
 export class Recorder {
   private isRecording = false
   private isPaused = false
-  private steps: FlowStep[] = []
   private clickHandler?: (event: MouseEvent) => void
   private config: RecorderConfig
 
@@ -38,7 +37,6 @@ export class Recorder {
 
     this.isRecording = true
     this.isPaused = false
-    this.steps = []
     this.attachClickListener()
     this.config.onRecordingStateChanged?.(true)
   }
@@ -46,12 +44,11 @@ export class Recorder {
   /**
    * Stop recording
    */
-  stop(): FlowStep[] {
+  stop(): void {
     this.isRecording = false
     this.isPaused = false
     this.detachClickListener()
     this.config.onRecordingStateChanged?.(false)
-    return [...this.steps]
   }
 
   /**
@@ -73,14 +70,8 @@ export class Recorder {
   }
 
   /**
-   * Get current steps
-   */
-  getSteps(): FlowStep[] {
-    return [...this.steps]
-  }
-
-  /**
    * Add a manual step
+   * Note: Order is managed by background script
    */
   addManualStep(explanation: string): void {
     if (!this.isRecording) return
@@ -90,19 +81,10 @@ export class Recorder {
       "", // No selector for manual steps
       window.location.href,
       explanation,
-      this.steps.length
+      0 // Order will be set by background
     )
 
-    this.steps.push(step)
     this.config.onStepCaptured?.(step)
-  }
-
-  /**
-   * Undo last step
-   */
-  undoLastStep(): FlowStep | null {
-    if (this.steps.length === 0) return null
-    return this.steps.pop() || null
   }
 
   /**
@@ -169,16 +151,14 @@ export class Recorder {
       selectorResult.selector,
       url,
       explanation,
-      this.steps.length,
+      0, // Order will be set by background script
       {
         elementText,
         nodeType,
       }
     )
 
-    this.steps.push(step)
-
-    // Call callback (no longer needs to wait for annotation modal)
+    // Forward to background immediately (no local storage)
     const result = this.config.onStepCaptured?.(step)
     if (result instanceof Promise) {
       await result

@@ -3,6 +3,13 @@
  * Priority: data-testid > ID > class combinations > XPath
  */
 
+// Declare CSS global for environments that don't have it
+declare const CSS:
+  | {
+      escape(value: string): string
+    }
+  | undefined
+
 export interface SelectorOptions {
   dataAttributes?: string[] // e.g., ['data-testid', 'data-id']
   preferId?: boolean
@@ -202,10 +209,27 @@ function findElementByXPath(xpath: string): Element | null {
 
 /**
  * Escape CSS selector special characters
+ * Uses CSS.escape() if available, otherwise falls back to manual escaping
  */
 function escapeSelector(selector: string): string {
-  // Escape special characters in CSS selectors
-  return selector.replace(/([!"#$%&'()*+,.:;<=>?@[\\\]^`{|}~])/g, "\\$1")
+  // Use native CSS.escape if available (modern browsers)
+  if (typeof CSS !== "undefined" && CSS.escape) {
+    return CSS.escape(selector)
+  }
+
+  // Fallback: Manual escaping for older environments
+  let escaped = selector
+
+  // Handle leading digit (must be escaped specially)
+  if (/^[0-9]/.test(escaped)) {
+    escaped = "\\3" + escaped.charAt(0) + " " + escaped.slice(1)
+  }
+
+  // Escape special characters
+  // Comprehensive list of CSS special characters that need escaping
+  escaped = escaped.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1")
+
+  return escaped
 }
 
 /**

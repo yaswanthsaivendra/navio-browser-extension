@@ -5,6 +5,7 @@
 
 import type { Flow, FlowStep } from "~/types/flows"
 import { logError } from "~/utils/errors"
+import { debounce } from "~/utils/performance"
 
 import { Highlight } from "./components/Highlight"
 import { Tooltip } from "./components/Tooltip"
@@ -188,7 +189,7 @@ export class Playback {
     this.scrollToElement(element)
 
     // Monitor for DOM changes
-    this.observeElement(element)
+    this.setupMutationObserver(element)
   }
 
   /**
@@ -203,16 +204,17 @@ export class Playback {
   }
 
   /**
-   * Observe element for DOM changes
+   * Set up mutation observer to monitor DOM changes
+   * Optimized with debouncing and reduced scope
    */
-  private observeElement(_element: Element): void {
-    // Cleanup existing observer
+  private setupMutationObserver(element: Element): void {
+    // Disconnect existing observer
     if (this.mutationObserver) {
       this.mutationObserver.disconnect()
     }
 
-    // Create new observer
-    this.mutationObserver = new MutationObserver(() => {
+    // Debounced handler to avoid excessive re-checks
+    const debouncedHandler = debounce(() => {
       // Re-check if element still exists
       if (!this.flow) return
 
@@ -231,13 +233,19 @@ export class Playback {
         // Element disappeared, show not found
         this.handleElementNotFound(step)
       }
-    })
+    }, 250) // Debounce for 250ms
 
-    // Observe document for changes
-    this.mutationObserver.observe(document.body, {
+    // Create new observer
+    this.mutationObserver = new MutationObserver(debouncedHandler)
+
+    // Observe only the element's parent or a reasonable ancestor
+    // This is more efficient than observing document.body
+    const observeTarget = element.parentElement || document.body
+
+    this.mutationObserver.observe(observeTarget, {
       childList: true,
       subtree: true,
-      attributes: true,
+      attributes: false, // Don't need attribute changes
       attributeOldValue: false,
     })
   }

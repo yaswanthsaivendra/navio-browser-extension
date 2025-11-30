@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid"
 import type { Flow, FlowStep, StorageData } from "~/types/flows"
 
 import { logError, safeAsync } from "./errors"
+import { validateAndSanitizeFlow } from "./validation"
 
 const STORAGE_KEY = "navio_flows"
 
@@ -63,11 +64,14 @@ export async function saveFlow(flow: Flow): Promise<boolean> {
     return false
   }
   return safeAsync(async () => {
+    // Validate and sanitize the flow before saving
+    const validatedFlow = validateAndSanitizeFlow(flow)
+
     const flows = await getAllFlows()
-    const existingIndex = flows.findIndex((f) => f.id === flow.id)
+    const existingIndex = flows.findIndex((f) => f.id === validatedFlow.id)
 
     const updatedFlow: Flow = {
-      ...flow,
+      ...validatedFlow,
       updatedAt: new Date().toISOString(),
     }
 
@@ -167,14 +171,15 @@ export function exportFlowToJSON(flow: Flow): string {
  */
 export function importFlowFromJSON(json: string): Flow | null {
   try {
-    const flow = JSON.parse(json) as Flow
-    // Validate required fields
-    if (!flow.id || !flow.name || !flow.steps) {
-      throw new Error("Invalid flow format")
-    }
-    // Generate new ID to avoid conflicts
+    const data = JSON.parse(json)
+
+    // Validate and sanitize the imported flow
+    const flow = validateAndSanitizeFlow(data)
+
+    // Generate new ID and timestamp to avoid conflicts
     flow.id = uuidv4()
     flow.createdAt = new Date().toISOString()
+
     return flow
   } catch (error) {
     logError(error, { context: "import-flow" })

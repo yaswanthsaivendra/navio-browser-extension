@@ -15,6 +15,7 @@ import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import type { Flow, FlowStep } from "~/types/flows"
 import { logError } from "~/utils/errors"
+import { logger } from "~/utils/logger"
 import { ensureContentScriptReady, sendMessage } from "~/utils/messaging"
 import { createFlow, getAllFlows } from "~/utils/storage"
 
@@ -86,7 +87,7 @@ function Popup() {
       const response = await sendMessage({
         type: "GET_RECORDING_STATE",
       })
-      console.warn("[Navio Popup] checkRecordingState response", {
+      logger.debug("checkRecordingState response", {
         success: response.success,
         data: response.data,
         currentState: state,
@@ -100,17 +101,14 @@ function Popup() {
         setStepCount(data.stepCount || 0)
         // Update state if recording stopped
         if (!data.isRecording && state === "recording") {
-          console.warn(
-            "[Navio Popup] Recording stopped, setting state to idle",
-            {
-              wasRecording: state,
-              isRecording: data.isRecording,
-            }
-          )
+          logger.debug("Recording stopped, setting state to idle", {
+            wasRecording: state,
+            isRecording: data.isRecording,
+          })
           setState("idle")
         } else if (data.isRecording && state !== "recording") {
-          console.warn(
-            "[Navio Popup] Recording active but state was not recording, updating",
+          logger.debug(
+            "Recording active but state was not recording, updating",
             {
               wasState: state,
               isRecording: data.isRecording,
@@ -119,13 +117,13 @@ function Popup() {
           setState("recording")
         }
       } else {
-        console.warn("[Navio Popup] checkRecordingState failed", {
+        logger.debug("checkRecordingState failed", {
           success: response.success,
           error: response.error,
         })
       }
     } catch (error) {
-      console.warn("[Navio Popup] checkRecordingState error", error)
+      logger.debug("checkRecordingState error", error)
       logError(error, { context: "check-recording-state" })
     }
   }
@@ -139,7 +137,7 @@ function Popup() {
         currentWindow: true,
       })
 
-      console.warn("[Navio Popup] Initial tab query result", {
+      logger.debug("Initial tab query result", {
         tabsCount: tabs.length,
         firstTabId: tabs[0]?.id,
         firstTabUrl: tabs[0]?.url,
@@ -147,9 +145,9 @@ function Popup() {
 
       // Fallback: if no active tab, try to get the current window's tabs
       if (!tabs[0]?.id) {
-        console.warn("[Navio Popup] No active tab found, trying fallback query")
+        logger.debug("No active tab found, trying fallback query")
         tabs = await chrome.tabs.query({ currentWindow: true })
-        console.warn("[Navio Popup] Fallback query result", {
+        logger.debug("Fallback query result", {
           tabsCount: tabs.length,
           tabs: tabs.map((t) => ({ id: t.id, url: t.url, active: t.active })),
         })
@@ -162,7 +160,7 @@ function Popup() {
             !t.url.startsWith("chrome-extension://")
         )
         if (validTab) {
-          console.warn("[Navio Popup] Found valid tab in fallback", {
+          logger.debug("Found valid tab in fallback", {
             id: validTab.id,
             url: validTab.url,
           })
@@ -171,7 +169,7 @@ function Popup() {
       }
 
       if (!tabs[0] || !tabs[0].id) {
-        console.error("[Navio Popup] No valid tab found", {
+        logger.error("No valid tab found", {
           tabsCount: tabs.length,
           allTabs: tabs.map((t) => ({ id: t.id, url: t.url })),
         })
@@ -232,29 +230,29 @@ function Popup() {
       }
 
       // Now send the start recording message to background (which will forward to content script)
-      console.warn("[Navio Popup] Sending START_RECORDING to background", {
+      logger.debug("Sending START_RECORDING to background", {
         tabId: tab.id,
       })
       const response = await sendMessage({
         type: "START_RECORDING",
       })
 
-      console.warn("[Navio Popup] START_RECORDING response", {
+      logger.debug("START_RECORDING response", {
         success: response.success,
         data: response.data,
         error: response.error,
       })
 
       if (response.success) {
-        console.warn(
-          "[Navio Popup] Recording started successfully, setting state to recording"
+        logger.debug(
+          "Recording started successfully, setting state to recording"
         )
         setState("recording")
         setStepCount(0)
       } else {
         // Show user-friendly error
         const errorMsg = response.error || "Failed to start recording"
-        console.warn("[Navio Popup] Failed to start recording", {
+        logger.debug("Failed to start recording", {
           error: errorMsg,
         })
         alert(`Error: ${errorMsg}`)
@@ -374,7 +372,7 @@ function Popup() {
   const handleStartPlayback = async (flowId: string) => {
     setIsLoading(true)
     try {
-      console.warn("[Navio Popup] Starting playback for flow:", flowId)
+      logger.debug("Starting playback for flow:", flowId)
       console.warn("[Navio Popup] Chrome API available:", {
         hasChrome: typeof chrome !== "undefined",
         hasTabs: typeof chrome?.tabs !== "undefined",
@@ -385,7 +383,7 @@ function Popup() {
       let tabs: chrome.tabs.Tab[] = []
       try {
         tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-        console.warn("[Navio Popup] Initial playback tab query result", {
+        logger.debug("Initial playback tab query result", {
           tabsCount: tabs.length,
           firstTabId: tabs[0]?.id,
           firstTabUrl: tabs[0]?.url,
@@ -397,12 +395,10 @@ function Popup() {
 
       // Fallback: if no active tab, try to get the current window's tabs
       if (!tabs[0]?.id) {
-        console.warn(
-          "[Navio Popup] No active tab found for playback, trying fallback query"
-        )
+        logger.debug("No active tab found for playback, trying fallback query")
         try {
           tabs = await chrome.tabs.query({ currentWindow: true })
-          console.warn("[Navio Popup] Fallback playback query result", {
+          logger.debug("Fallback playback query result", {
             tabsCount: tabs.length,
             tabs: tabs.map((t) => ({
               id: t.id,
@@ -425,17 +421,14 @@ function Popup() {
             !t.url.startsWith("edge://")
         )
         if (validTab) {
-          console.warn(
-            "[Navio Popup] Found valid tab for playback in fallback",
-            {
-              id: validTab.id,
-              url: validTab.url,
-              title: validTab.title,
-            }
-          )
+          logger.debug("Found valid tab for playback in fallback", {
+            id: validTab.id,
+            url: validTab.url,
+            title: validTab.title,
+          })
           tabs = [validTab]
         } else {
-          console.warn("[Navio Popup] No valid tab found in fallback", {
+          logger.debug("No valid tab found in fallback", {
             allTabs: tabs.map((t) => ({
               id: t.id,
               url: t.url,
@@ -446,7 +439,7 @@ function Popup() {
       }
 
       if (!tabs[0] || !tabs[0].id) {
-        console.error("[Navio Popup] No valid tab found for playback", {
+        logger.error("No valid tab found for playback", {
           tabsCount: tabs.length,
           allTabs: tabs.map((t) => ({
             id: t.id,
@@ -466,7 +459,7 @@ function Popup() {
       }
 
       const tab = tabs[0]
-      console.warn("[Navio Popup] Selected tab for playback", {
+      logger.debug("Selected tab for playback", {
         id: tab.id,
         url: tab.url,
         title: tab.title,
@@ -517,7 +510,7 @@ function Popup() {
 
       if (response.success) {
         setState("playback")
-        console.warn("[Navio Popup] Playback started", { flowId })
+        logger.debug("Playback started", { flowId })
       } else {
         alert(response.error || "Failed to start playback")
       }
@@ -538,7 +531,7 @@ function Popup() {
 
       if (response.success) {
         setState("idle")
-        console.warn("[Navio Popup] Playback stopped")
+        logger.debug("Playback stopped")
       } else {
         alert(response.error || "Failed to stop playback")
       }
