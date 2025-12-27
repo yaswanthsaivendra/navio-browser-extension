@@ -2,14 +2,13 @@ import { SCREENSHOT_CONFIG } from "~/constants"
 
 import { logError } from "./errors"
 import { logger } from "./logger"
-import { dataUrlToBlob } from "./screenshot-capture"
 
 /**
  * Screenshot processing utilities for content scripts
- * Handles compression and thumbnail generation using DOM APIs (Canvas, Image)
+ * Handles compression, thumbnail generation, and image transformation
  *
- * Note: This file is for content script context only (has DOM APIs).
- * For service worker utilities, see screenshot-capture.ts
+ * Note: This file is for content script context only (requires DOM APIs: Canvas, Image).
+ * For screenshot capture (service worker), see screenshot-capture.ts
  */
 
 // Type declarations for browser globals (content script context)
@@ -21,6 +20,17 @@ export interface ScreenshotResult {
   thumbnail: string // Base64 thumbnail (50-100KB)
   full?: string // Base64 full screenshot (if small enough)
   indexedDB?: boolean // Flag if full screenshot should be stored in IndexedDB
+}
+
+/**
+ * Capture visible tab as screenshot
+ * @deprecated Use screenshot-capture.ts for background script
+ * This is kept for backward compatibility but should not be used in service workers
+ */
+export async function captureVisibleTab(tabId?: number): Promise<string> {
+  // Re-export from screenshot-capture for content scripts that might still use this
+  const { captureVisibleTab: capture } = await import("./screenshot-capture")
+  return capture(tabId)
 }
 
 /**
@@ -91,6 +101,25 @@ export async function generateThumbnail(
   maxWidth: number = SCREENSHOT_CONFIG.THUMBNAIL_MAX_WIDTH
 ): Promise<string> {
   return compressImage(dataUrl, SCREENSHOT_CONFIG.THUMBNAIL_QUALITY, maxWidth)
+}
+
+/**
+ * Convert data URL to Blob
+ * Re-exports from screenshot-capture for content scripts
+ * Note: This is a synchronous function that works in both content script and service worker contexts
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const arr = dataUrl.split(",")
+  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/png"
+  const bstr = atob(arr[1])
+  let n = bstr.length
+  const u8arr = new Uint8Array(n)
+
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n)
+  }
+
+  return new Blob([u8arr], { type: mime })
 }
 
 /**

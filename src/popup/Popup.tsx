@@ -1,6 +1,5 @@
 import { Eye, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
-import toast from "react-hot-toast"
 
 import { Button } from "~/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
@@ -135,7 +134,7 @@ function Popup() {
       }
 
       if (!tabs[0] || !tabs[0].id) {
-        toast.error("No active tab found. Please open a webpage first.")
+        alert("No active tab found. Please open a webpage first.")
         setIsLoading(false)
         return
       }
@@ -148,7 +147,7 @@ function Popup() {
           tab.url.startsWith("chrome-extension://") ||
           tab.url.startsWith("edge://"))
       ) {
-        toast.error(
+        alert(
           "Recording cannot start on this page. Please navigate to a regular website (like google.com) to start recording."
         )
         setIsLoading(false)
@@ -157,7 +156,7 @@ function Popup() {
 
       // Ensure content script is ready
       if (!tab.id) {
-        toast.error("Invalid tab. Please try again.")
+        alert("Invalid tab. Please try again.")
         setIsLoading(false)
         return
       }
@@ -182,14 +181,12 @@ function Popup() {
           // Try again after reload
           const retryReady = await ensureContentScriptReady(tab.id)
           if (!retryReady) {
-            toast.error(
-              "Please wait a moment, then click 'Start Recording' again."
-            )
+            alert("Please wait a moment, then click 'Start Recording' again.")
             setIsLoading(false)
             return
           }
         } else {
-          toast.error("Please refresh the page manually, then try again.")
+          alert("Please refresh the page manually, then try again.")
           setIsLoading(false)
           return
         }
@@ -203,9 +200,8 @@ function Popup() {
       if (response.success) {
         setState("recording")
         setStepCount(0)
-        toast.success("Recording started!")
       } else {
-        toast.error(response.error || "Failed to start recording")
+        alert(`Error: ${response.error || "Failed to start recording"}`)
       }
     } catch (error) {
       logError(error)
@@ -214,11 +210,11 @@ function Popup() {
         errorMsg.includes("Receiving end does not exist") ||
         errorMsg.includes("Could not establish connection")
       ) {
-        toast.error(
+        alert(
           "Content script not loaded. Please refresh the page and try again."
         )
       } else {
-        toast.error("Failed to start recording. Please try again.")
+        alert("Failed to start recording. Please try again.")
       }
     } finally {
       setIsLoading(false)
@@ -240,15 +236,15 @@ function Popup() {
           setFlowName("New Flow")
           setShowSaveDialog(true)
         } else {
-          toast.error("No steps recorded. Please record at least one step.")
+          alert("No steps recorded. Please record at least one step.")
           setState("idle")
         }
       } else {
-        toast.error(response.error || "Failed to stop recording")
+        alert(response.error || "Failed to stop recording")
       }
     } catch (error) {
       logError(error)
-      toast.error("Failed to stop recording. Please try again.")
+      alert("Failed to stop recording. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -257,12 +253,12 @@ function Popup() {
   const handleSaveFlow = async () => {
     const trimmedName = flowName.trim()
     if (!trimmedName) {
-      toast.error("Please enter a flow name")
+      alert("Please enter a flow name")
       return
     }
 
     if (trimmedName.length > UI_CONFIG.MAX_FLOW_NAME_LENGTH) {
-      toast.error(
+      alert(
         `Flow name must be ${UI_CONFIG.MAX_FLOW_NAME_LENGTH} characters or less`
       )
       return
@@ -281,7 +277,9 @@ function Popup() {
         if (step.meta?.screenshotIndexedDB && step.meta?.screenshotFull) {
           try {
             // Convert data URL to Blob using dataUrlToBlob utility
-            const { dataUrlToBlob } = await import("~/utils/screenshot-capture")
+            const { dataUrlToBlob } = await import(
+              "~/utils/screenshot-processing"
+            )
             const blob = dataUrlToBlob(step.meta.screenshotFull)
             await sendMessage({
               type: "SAVE_SCREENSHOT",
@@ -306,10 +304,9 @@ function Popup() {
       setFlowName("")
       setPendingSteps([])
       setState("idle")
-      toast.success(`Flow "${trimmedName}" saved successfully!`)
     } catch (error) {
       logError(error)
-      toast.error("Failed to save flow. Please try again.")
+      alert("Failed to save flow. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -347,20 +344,19 @@ function Popup() {
           setShowFlowDetails(false)
           setSelectedFlow(null)
         }
-        toast.success(`Flow "${flowName}" deleted successfully`)
       } else {
-        toast.error(response.error || "Failed to delete flow")
+        alert(response.error || "Failed to delete flow")
       }
     } catch (error) {
       logError(error)
-      toast.error("Failed to delete flow. Please try again.")
+      alert("Failed to delete flow. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="p-4 w-[400px]">
+    <div className="p-4 w-[360px]">
       <h2 className="m-0 mb-4 text-lg font-semibold">Navio</h2>
 
       {state === "idle" && (
