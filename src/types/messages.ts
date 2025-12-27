@@ -13,18 +13,15 @@ export type MessageType =
   | "ADD_STEP"
   | "ADD_MANUAL_STEP"
   | "UNDO_LAST_STEP"
-  | "START_PLAYBACK"
-  | "STOP_PLAYBACK"
-  | "NEXT_STEP"
-  | "PREVIOUS_STEP"
-  | "JUMP_TO_STEP"
   | "GET_RECORDING_STATE"
-  | "GET_PLAYBACK_STATE"
   | "GET_FLOWS"
   | "SAVE_FLOW"
   | "DELETE_FLOW"
   | "EXPORT_FLOW"
   | "IMPORT_FLOW"
+  | "SAVE_SCREENSHOT"
+  | "DELETE_SCREENSHOTS"
+  | "CAPTURE_SCREENSHOT"
 
 export interface BaseMessage {
   type: MessageType
@@ -34,6 +31,7 @@ export interface BaseMessage {
 // Recording Messages
 export interface StartRecordingMessage extends BaseMessage {
   type: "START_RECORDING"
+  tabId?: number // Optional tabId passed from background to content script
 }
 
 export interface StopRecordingMessage extends BaseMessage {
@@ -52,7 +50,6 @@ export interface ResumeRecordingMessage extends BaseMessage {
 export interface CaptureClickMessage extends BaseMessage {
   type: "CAPTURE_CLICK"
   element: {
-    selector: string
     url: string
     text?: string
     nodeType?: string
@@ -75,36 +72,9 @@ export interface UndoLastStepMessage extends BaseMessage {
   type: "UNDO_LAST_STEP"
 }
 
-// Playback Messages
-export interface StartPlaybackMessage extends BaseMessage {
-  type: "START_PLAYBACK"
-  flowId: string
-}
-
-export interface StopPlaybackMessage extends BaseMessage {
-  type: "STOP_PLAYBACK"
-}
-
-export interface NextStepMessage extends BaseMessage {
-  type: "NEXT_STEP"
-}
-
-export interface PreviousStepMessage extends BaseMessage {
-  type: "PREVIOUS_STEP"
-}
-
-export interface JumpToStepMessage extends BaseMessage {
-  type: "JUMP_TO_STEP"
-  stepIndex: number
-}
-
 // State Messages
 export interface GetRecordingStateMessage extends BaseMessage {
   type: "GET_RECORDING_STATE"
-}
-
-export interface GetPlaybackStateMessage extends BaseMessage {
-  type: "GET_PLAYBACK_STATE"
 }
 
 export interface GetFlowsMessage extends BaseMessage {
@@ -128,7 +98,25 @@ export interface ExportFlowMessage extends BaseMessage {
 
 export interface ImportFlowMessage extends BaseMessage {
   type: "IMPORT_FLOW"
-  flow: Flow
+  flow: string // JSON string representation of Flow
+}
+
+// Screenshot Messages
+export interface SaveScreenshotMessage extends BaseMessage {
+  type: "SAVE_SCREENSHOT"
+  flowId: string
+  stepId: string
+  screenshot: Blob
+}
+
+export interface DeleteScreenshotsMessage extends BaseMessage {
+  type: "DELETE_SCREENSHOTS"
+  flowId: string
+}
+
+export interface CaptureScreenshotMessage extends BaseMessage {
+  type: "CAPTURE_SCREENSHOT"
+  tabId: number
 }
 
 // Union type for all messages
@@ -141,18 +129,15 @@ export type Message =
   | AddStepMessage
   | AddManualStepMessage
   | UndoLastStepMessage
-  | StartPlaybackMessage
-  | StopPlaybackMessage
-  | NextStepMessage
-  | PreviousStepMessage
-  | JumpToStepMessage
   | GetRecordingStateMessage
-  | GetPlaybackStateMessage
   | GetFlowsMessage
   | SaveFlowMessage
   | DeleteFlowMessage
   | ExportFlowMessage
   | ImportFlowMessage
+  | SaveScreenshotMessage
+  | DeleteScreenshotsMessage
+  | CaptureScreenshotMessage
 
 // Response types
 export interface MessageResponse<T = unknown> {

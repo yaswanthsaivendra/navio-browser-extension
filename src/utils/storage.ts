@@ -4,12 +4,13 @@
 
 import { v4 as uuidv4 } from "uuid"
 
+import { STORAGE_CONFIG } from "~/constants"
 import type { Flow, FlowStep, StorageData } from "~/types/flows"
 
 import { logError, safeAsync } from "./errors"
 import { validateAndSanitizeFlow } from "./validation"
 
-const STORAGE_KEY = "navio_flows"
+const STORAGE_KEY = STORAGE_CONFIG.FLOWS_KEY
 
 /**
  * Check if chrome.storage is available
@@ -138,7 +139,6 @@ export async function createFlow(
  */
 export function createFlowStep(
   type: FlowStep["type"],
-  selector: string,
   url: string,
   explanation: string,
   order: number = 0,
@@ -147,7 +147,6 @@ export function createFlowStep(
   return {
     id: uuidv4(),
     type,
-    selector,
     url,
     explanation,
     order,
@@ -185,17 +184,4 @@ export function importFlowFromJSON(json: string): Flow | null {
     logError(error, { context: "import-flow" })
     return null
   }
-}
-
-/**
- * Clear all flows (use with caution)
- */
-export async function clearAllFlows(): Promise<boolean> {
-  if (!isStorageAvailable()) {
-    return false
-  }
-  return safeAsync(async () => {
-    await chrome.storage.local.remove(STORAGE_KEY)
-    return true
-  }, false) as Promise<boolean>
 }

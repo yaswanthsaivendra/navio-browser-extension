@@ -10,21 +10,14 @@ When clicking the extension icon:
 
 1. **Idle State**
 
-   - Button: “Start Recording”
-   - Button: “Load Existing Flows”
-   - Settings icon
+   - Button: "Start Recording"
+   - List of saved flows with "View Details" and "Delete" buttons
 
 2. **Recording State**
 
-   - Indicator: Red dot + “Recording…”
-   - Button: “Pause Recording”
-   - Button: “Finish & Save Flow”
+   - Indicator: Red dot + "Recording…"
+   - Button: "Finish & Save Flow"
    - Steps counter
-
-3. **Playback State**
-   - Dropdown: Select Flow
-   - Button: “Start Guided Demo”
-   - Button: “Open Editor”
 
 ## 2. Recording UI
 
@@ -42,27 +35,8 @@ Steps are automatically annotated during recording:
 
 - Auto-generated explanation (60-100 characters)
 - Auto-numbered sequentially (Step 1, Step 2, etc.)
-- Based on element text, selector, and action type
-- Steps can be edited later after recording is complete
-
-## 4. Playback Overlay UI
-
-During live demo playback:
-
-### Elements:
-
-- A tooltip box next to the target element:
-  - Step explanation (single field)
-- Highlight ring around element
-- Floating step navigator:
-  - “Next Step”
-  - “Previous Step”
-  - “Jump to Step”
-  - Branch flow selector (if applicable)
-- Presenter-only panel (visible only to rep):
-  - Notes
-  - Client persona preset selection
-  - Suggested phrases to say
+- Based on element text and action type
+- Screenshot captured at each step
 
 ## 5. UX Rules
 

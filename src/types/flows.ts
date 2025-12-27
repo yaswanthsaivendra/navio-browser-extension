@@ -13,7 +13,6 @@ export type StepType =
 export interface FlowStep {
   id: string
   type: StepType
-  selector: string
   url: string
   explanation: string // Single explanation field (60-100 characters)
   order: number
@@ -21,7 +20,9 @@ export interface FlowStep {
     elementText?: string
     nodeType?: string
     timestamp?: string
-    screenshotThumb?: string
+    screenshotThumb?: string // Base64 thumbnail (required)
+    screenshotFull?: string // Base64 full (if small enough)
+    screenshotIndexedDB?: boolean // Flag if stored in IndexedDB
     createdAt?: string
   }
 }

@@ -1,17 +1,14 @@
 // Content script - runs on web pages
 // This will be used for recording and overlay functionality
 
-import { StrictMode } from "react"
-import { createRoot } from "react-dom/client"
-
-import type { Flow } from "~/types/flows"
-import type { Message, MessageResponse } from "~/types/messages"
+import type {
+  Message,
+  MessageResponse,
+  StartRecordingMessage,
+} from "~/types/messages"
 import { logError } from "~/utils/errors"
 import { onMessage, sendMessage } from "~/utils/messaging"
-import { getFlowById } from "~/utils/storage"
 
-import { PresenterPanel } from "./components/PresenterPanel"
-import { Playback } from "./playback"
 import { Recorder } from "./recorder"
 
 import "./components/styles.css"
@@ -29,48 +26,26 @@ window.__NAVIO_CONTENT_SCRIPT_READY__ = false
 // Initialize recorder
 let recorder: Recorder | null = null
 
-// Initialize playback
-let playback: Playback | null = null
-let presenterPanelRoot: HTMLDivElement | null = null
-let presenterPanelReactRoot: ReturnType<typeof createRoot> | null = null
-
 // Initialize content script
 try {
   // Create recorder instance
   recorder = new Recorder({
     onStepCaptured: async (step) => {
-      console.warn("[Navio Content] Step captured", {
-        stepId: step.id,
-        explanation: step.explanation.substring(0, 50),
-        url: step.url,
-        order: step.order,
-      })
       // Send step immediately to background script for persistence
       sendMessage({
         type: "ADD_STEP",
         step,
+      }).catch((error) => {
+        logError(error, {
+          context: "add-step-to-background",
+          stepId: step.id,
+        })
       })
-        .then(() => {
-          console.warn("[Navio Content] Step sent to background successfully", {
-            stepId: step.id,
-          })
-        })
-        .catch((error) => {
-          console.warn("[Navio Content] Failed to send step to background", {
-            stepId: step.id,
-            error,
-          })
-          logError(error, {
-            context: "add-step-to-background",
-            stepId: step.id,
-          })
-        })
 
       // Also notify about click (for backwards compatibility)
       sendMessage({
         type: "CAPTURE_CLICK",
         element: {
-          selector: step.selector,
           url: step.url,
           text: step.meta?.elementText,
           nodeType: step.meta?.nodeType,
@@ -84,51 +59,22 @@ try {
   // Check if recording is active and auto-resume
   async function checkAndResumeRecording() {
     try {
-      console.warn(
-        "[Navio Content] Checking if recording is active on page load",
-        {
-          url: window.location.href,
-        }
-      )
       const response = await sendMessage({
         type: "GET_RECORDING_STATE",
-      })
-      console.warn("[Navio Content] GET_RECORDING_STATE response", {
-        success: response.success,
-        data: response.data,
       })
       if (response.success && response.data) {
         const data = response.data as {
           isRecording: boolean
           state: string
           stepCount?: number
+          tabId?: number
         }
-        console.warn("[Navio Content] Recording state check result", {
-          isRecording: data.isRecording,
-          state: data.state,
-          stepCount: data.stepCount,
-        })
         if (data.isRecording && data.state === "recording" && recorder) {
-          // Auto-resume recording on this page
-          recorder.start()
-          console.warn("[Navio Content] Auto-resumed recording on page load", {
-            url: window.location.href,
-          })
-        } else {
-          console.warn("[Navio Content] Not resuming - recording not active", {
-            isRecording: data.isRecording,
-            state: data.state,
-            hasRecorder: !!recorder,
-          })
+          // Auto-resume recording on this page with tabId from session
+          recorder.start(data.tabId)
         }
-      } else {
-        console.warn("[Navio Content] GET_RECORDING_STATE failed", {
-          success: response.success,
-          error: response.error,
-        })
       }
     } catch (error) {
-      console.warn("[Navio Content] Error checking recording state", error)
       logError(error, { context: "check-and-resume-recording" })
     }
   }
@@ -144,13 +90,11 @@ try {
 
     try {
       switch (message.type) {
-        case "START_RECORDING":
-          console.warn("[Navio Content] START_RECORDING received", {
-            url: window.location.href,
-          })
-          recorder.start()
-          console.warn("[Navio Content] Recorder started")
+        case "START_RECORDING": {
+          const startMessage = message as StartRecordingMessage
+          await recorder.start(startMessage.tabId)
           return { success: true, data: { state: "recording" } }
+        }
 
         case "STOP_RECORDING": {
           const steps = recorder.stop()
@@ -184,107 +128,6 @@ try {
             },
           }
 
-        // Playback messages
-        case "START_PLAYBACK": {
-          if (!playback) {
-            playback = new Playback({
-              onStepChanged: (_stepIndex, _step) => {
-                // Update presenter panel if it exists
-                updatePresenterPanel()
-              },
-              onPlaybackStateChanged: (isPlaying) => {
-                if (!isPlaying) {
-                  // Cleanup presenter panel
-                  cleanupPresenterPanel()
-                }
-              },
-              onElementNotFound: (step) => {
-                console.warn(
-                  "[Navio Content] Element not found during playback",
-                  {
-                    selector: step.selector,
-                    explanation: step.explanation,
-                  }
-                )
-              },
-            })
-          }
-
-          // Load flow from storage
-          const flow = await getFlowById(message.flowId)
-          if (!flow) {
-            return { success: false, error: "Flow not found" }
-          }
-
-          // Start playback
-          playback.start(flow)
-
-          // Render presenter panel
-          renderPresenterPanel(flow)
-
-          return { success: true, data: { flowId: flow.id } }
-        }
-
-        case "STOP_PLAYBACK": {
-          if (playback) {
-            playback.stop()
-            playback = null
-          }
-          cleanupPresenterPanel()
-          return { success: true }
-        }
-
-        case "NEXT_STEP": {
-          if (playback) {
-            await playback.next()
-            updatePresenterPanel()
-            return { success: true }
-          }
-          return { success: false, error: "Playback not active" }
-        }
-
-        case "PREVIOUS_STEP": {
-          if (playback) {
-            playback.previous()
-            updatePresenterPanel()
-            return { success: true }
-          }
-          return { success: false, error: "Playback not active" }
-        }
-
-        case "JUMP_TO_STEP": {
-          if (playback) {
-            playback.goToStep(message.stepIndex)
-            updatePresenterPanel()
-            return { success: true }
-          }
-          return { success: false, error: "Playback not active" }
-        }
-
-        case "GET_PLAYBACK_STATE": {
-          if (playback && playback.isActive()) {
-            const flow = playback.getFlow()
-            return {
-              success: true,
-              data: {
-                isPlaying: true,
-                currentStepIndex: playback.getCurrentStepIndex(),
-                flowId: flow?.id,
-                totalSteps: flow?.steps.length || 0,
-              },
-            }
-          }
-          return {
-            success: true,
-            data: {
-              isPlaying: false,
-              currentStepIndex: 0,
-              flowId: null,
-              totalSteps: 0,
-            },
-          }
-        }
-
         default:
           return { success: false, error: "Unknown message type" }
       }
@@ -297,93 +140,8 @@ try {
     }
   })
 
-  // Helper functions for presenter panel
-  function renderPresenterPanel(_flow: Flow): void {
-    // Remove existing panel if any
-    cleanupPresenterPanel()
-
-    // Create container
-    presenterPanelRoot = document.createElement("div")
-    presenterPanelRoot.setAttribute(
-      "data-navio-extension",
-      "presenter-panel-root"
-    )
-    document.body.appendChild(presenterPanelRoot)
-
-    // Create React root
-    presenterPanelReactRoot = createRoot(presenterPanelRoot)
-
-    // Render panel
-    updatePresenterPanel()
-  }
-
-  function updatePresenterPanel(): void {
-    if (
-      !presenterPanelRoot ||
-      !presenterPanelReactRoot ||
-      !playback ||
-      !playback.isActive()
-    ) {
-      return
-    }
-
-    const flow = playback.getFlow()
-    if (!flow) return
-
-    // Re-render with updated step index
-    presenterPanelReactRoot.render(
-      <StrictMode>
-        <PresenterPanel
-          flow={flow}
-          currentStepIndex={playback.getCurrentStepIndex()}
-          onClose={() => {
-            if (playback) {
-              playback.stop()
-              playback = null
-            }
-            cleanupPresenterPanel()
-            // Notify background
-            sendMessage({ type: "STOP_PLAYBACK" }).catch((error) => {
-              logError(error, { context: "stop-playback-on-close" })
-            })
-          }}
-          onNext={async () => {
-            if (playback) {
-              await playback.next()
-              updatePresenterPanel()
-            }
-          }}
-          onPrevious={() => {
-            if (playback) {
-              playback.previous()
-              updatePresenterPanel()
-            }
-          }}
-          onJumpToStep={(index) => {
-            if (playback) {
-              playback.goToStep(index)
-              updatePresenterPanel()
-            }
-          }}
-        />
-      </StrictMode>
-    )
-  }
-
-  function cleanupPresenterPanel(): void {
-    if (presenterPanelReactRoot) {
-      presenterPanelReactRoot.unmount()
-      presenterPanelReactRoot = null
-    }
-    if (presenterPanelRoot) {
-      presenterPanelRoot.remove()
-      presenterPanelRoot = null
-    }
-  }
-
   // Mark as ready after successful initialization
   window.__NAVIO_CONTENT_SCRIPT_READY__ = true
-  console.warn("Navio extension content script loaded")
 } catch (error) {
   logError(error, { context: "content-script-init" })
   // Don't mark as ready if initialization failed

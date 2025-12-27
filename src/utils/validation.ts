@@ -11,7 +11,6 @@ import { z } from "zod"
 export const FlowStepSchema = z.object({
   id: z.string().uuid(),
   type: z.enum(["click", "navigation", "input", "visibility", "manual"]),
-  selector: z.string(),
   url: z.string().url(),
   explanation: z.string().min(1).max(200), // Allow up to 200 chars
   order: z.number().int().min(0),
@@ -20,7 +19,9 @@ export const FlowStepSchema = z.object({
       elementText: z.string().optional(),
       nodeType: z.string().optional(),
       timestamp: z.string().optional(),
-      screenshotThumb: z.string().optional(),
+      screenshotThumb: z.string().optional(), // Required for screenshot mode
+      screenshotFull: z.string().optional(),
+      screenshotIndexedDB: z.boolean().optional(),
       createdAt: z.string().optional(),
     })
     .optional(),
@@ -57,21 +58,6 @@ export const StorageDataSchema = z.object({
 })
 
 /**
- * Sanitize a CSS selector to prevent XSS
- */
-export function sanitizeSelector(selector: string): string {
-  // Remove any script tags or javascript: protocols
-  let sanitized = selector.replace(/<script[^>]*>.*?<\/script>/gi, "")
-  sanitized = sanitized.replace(/javascript:/gi, "")
-  sanitized = sanitized.replace(/on\w+\s*=/gi, "") // Remove event handlers
-
-  // Trim and limit length
-  sanitized = sanitized.trim().substring(0, 1000)
-
-  return sanitized
-}
-
-/**
  * Sanitize a URL to ensure it's safe
  */
 export function sanitizeUrl(url: string): string {
@@ -95,8 +81,7 @@ export function validateAndSanitizeStep(
 ): z.infer<typeof FlowStepSchema> {
   const validated = FlowStepSchema.parse(step)
 
-  // Sanitize selector and URL
-  validated.selector = sanitizeSelector(validated.selector)
+  // Sanitize URL
   validated.url = sanitizeUrl(validated.url)
 
   return validated
@@ -113,7 +98,6 @@ export function validateAndSanitizeFlow(
   // Sanitize all steps
   validated.steps = validated.steps.map((step) => ({
     ...step,
-    selector: sanitizeSelector(step.selector),
     url: sanitizeUrl(step.url),
   }))
 

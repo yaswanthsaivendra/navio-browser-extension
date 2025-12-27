@@ -1,6 +1,6 @@
 # Navio Browser Extension
 
-Browser extension for recording and replaying demo flows with live overlay guidance. Sales reps can trigger flows that highlight UI elements, show tooltips, and display presenter notes directly on top of the real product during screen-share demos.
+Browser extension for recording demo flows using screenshot-based recording. Sales reps can record standalone demos that work without requiring the live product to be accessible.
 
 This is a Chrome extension built with Vite, React, and TypeScript using industry-standard practices.
 

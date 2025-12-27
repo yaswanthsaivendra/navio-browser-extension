@@ -1,5 +1,6 @@
 import { Eye, Trash2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import toast from "react-hot-toast"
 
 import { Button } from "~/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
@@ -13,13 +14,18 @@ import {
 } from "~/components/ui/dialog"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
+import { RECORDING_CONFIG, UI_CONFIG } from "~/constants"
 import type { Flow, FlowStep } from "~/types/flows"
+import type {
+  SaveFlowMessage,
+  SaveScreenshotMessage,
+  StartRecordingMessage,
+} from "~/types/messages"
 import { logError } from "~/utils/errors"
-import { logger } from "~/utils/logger"
 import { ensureContentScriptReady, sendMessage } from "~/utils/messaging"
 import { createFlow, getAllFlows } from "~/utils/storage"
 
-type PopupState = "idle" | "recording" | "playback"
+type PopupState = "idle" | "recording"
 
 function Popup() {
   const [state, setState] = useState<PopupState>("idle")
@@ -31,6 +37,35 @@ function Popup() {
   const [pendingSteps, setPendingSteps] = useState<FlowStep[]>([])
   const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null)
   const [showFlowDetails, setShowFlowDetails] = useState(false)
+
+  const loadFlows = async () => {
+    const loadedFlows = await getAllFlows()
+    setFlows(loadedFlows)
+  }
+
+  const checkRecordingState = useCallback(async () => {
+    try {
+      // Get recording state from background script (persists across navigations)
+      const response = await sendMessage({
+        type: "GET_RECORDING_STATE",
+      })
+      if (response.success && response.data) {
+        const data = response.data as {
+          stepCount: number
+          isRecording: boolean
+          state?: string
+        }
+        setStepCount(data.stepCount || 0)
+        if (!data.isRecording && state === "recording") {
+          setState("idle")
+        } else if (data.isRecording && state !== "recording") {
+          setState("recording")
+        }
+      }
+    } catch (error) {
+      logError(error, { context: "check-recording-state" })
+    }
+  }, [state])
 
   // Load flows and check recording state on mount
   useEffect(() => {
@@ -56,12 +91,11 @@ function Popup() {
             // Check recording state after retry
             await checkRecordingState()
           }
-        }, 200)
+        }, RECORDING_CONFIG.STORAGE_CHECK_RETRY_MS)
       }
     }
     checkAndLoad()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [checkRecordingState])
 
   // Poll for recording state (only when recording)
   useEffect(() => {
@@ -69,64 +103,11 @@ function Popup() {
       checkRecordingState() // Check immediately
       const interval = window.setInterval(() => {
         checkRecordingState()
-      }, 500)
+      }, RECORDING_CONFIG.POLLING_INTERVAL_MS)
       return () => window.clearInterval(interval)
     }
     return undefined
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state])
-
-  const loadFlows = async () => {
-    const loadedFlows = await getAllFlows()
-    setFlows(loadedFlows)
-  }
-
-  const checkRecordingState = async () => {
-    try {
-      // Get recording state from background script (persists across navigations)
-      const response = await sendMessage({
-        type: "GET_RECORDING_STATE",
-      })
-      logger.debug("checkRecordingState response", {
-        success: response.success,
-        data: response.data,
-        currentState: state,
-      })
-      if (response.success && response.data) {
-        const data = response.data as {
-          stepCount: number
-          isRecording: boolean
-          state?: string
-        }
-        setStepCount(data.stepCount || 0)
-        // Update state if recording stopped
-        if (!data.isRecording && state === "recording") {
-          logger.debug("Recording stopped, setting state to idle", {
-            wasRecording: state,
-            isRecording: data.isRecording,
-          })
-          setState("idle")
-        } else if (data.isRecording && state !== "recording") {
-          logger.debug(
-            "Recording active but state was not recording, updating",
-            {
-              wasState: state,
-              isRecording: data.isRecording,
-            }
-          )
-          setState("recording")
-        }
-      } else {
-        logger.debug("checkRecordingState failed", {
-          success: response.success,
-          error: response.error,
-        })
-      }
-    } catch (error) {
-      logger.debug("checkRecordingState error", error)
-      logError(error, { context: "check-recording-state" })
-    }
-  }
+  }, [state, checkRecordingState])
 
   const handleStartRecording = async () => {
     setIsLoading(true)
@@ -137,20 +118,9 @@ function Popup() {
         currentWindow: true,
       })
 
-      logger.debug("Initial tab query result", {
-        tabsCount: tabs.length,
-        firstTabId: tabs[0]?.id,
-        firstTabUrl: tabs[0]?.url,
-      })
-
       // Fallback: if no active tab, try to get the current window's tabs
       if (!tabs[0]?.id) {
-        logger.debug("No active tab found, trying fallback query")
         tabs = await chrome.tabs.query({ currentWindow: true })
-        logger.debug("Fallback query result", {
-          tabsCount: tabs.length,
-          tabs: tabs.map((t) => ({ id: t.id, url: t.url, active: t.active })),
-        })
         // Get the first tab that's not a chrome:// page
         const validTab = tabs.find(
           (t) =>
@@ -160,20 +130,12 @@ function Popup() {
             !t.url.startsWith("chrome-extension://")
         )
         if (validTab) {
-          logger.debug("Found valid tab in fallback", {
-            id: validTab.id,
-            url: validTab.url,
-          })
           tabs = [validTab]
         }
       }
 
       if (!tabs[0] || !tabs[0].id) {
-        logger.error("No valid tab found", {
-          tabsCount: tabs.length,
-          allTabs: tabs.map((t) => ({ id: t.id, url: t.url })),
-        })
-        alert("No active tab found. Please open a webpage first.")
+        toast.error("No active tab found. Please open a webpage first.")
         setIsLoading(false)
         return
       }
@@ -186,7 +148,7 @@ function Popup() {
           tab.url.startsWith("chrome-extension://") ||
           tab.url.startsWith("edge://"))
       ) {
-        alert(
+        toast.error(
           "Recording cannot start on this page. Please navigate to a regular website (like google.com) to start recording."
         )
         setIsLoading(false)
@@ -195,7 +157,7 @@ function Popup() {
 
       // Ensure content script is ready
       if (!tab.id) {
-        alert("Invalid tab. Please try again.")
+        toast.error("Invalid tab. Please try again.")
         setIsLoading(false)
         return
       }
@@ -214,48 +176,36 @@ function Popup() {
         if (shouldRefresh && tab.id) {
           await chrome.tabs.reload(tab.id)
           // Wait for page to reload
-          await new Promise((resolve) => setTimeout(resolve, 1500))
+          await new Promise((resolve) =>
+            setTimeout(resolve, RECORDING_CONFIG.PAGE_RELOAD_WAIT_MS)
+          )
           // Try again after reload
           const retryReady = await ensureContentScriptReady(tab.id)
           if (!retryReady) {
-            alert("Please wait a moment, then click 'Start Recording' again.")
+            toast.error(
+              "Please wait a moment, then click 'Start Recording' again."
+            )
             setIsLoading(false)
             return
           }
         } else {
-          alert("Please refresh the page manually, then try again.")
+          toast.error("Please refresh the page manually, then try again.")
           setIsLoading(false)
           return
         }
       }
 
       // Now send the start recording message to background (which will forward to content script)
-      logger.debug("Sending START_RECORDING to background", {
-        tabId: tab.id,
-      })
       const response = await sendMessage({
         type: "START_RECORDING",
-      })
-
-      logger.debug("START_RECORDING response", {
-        success: response.success,
-        data: response.data,
-        error: response.error,
-      })
+      } as StartRecordingMessage)
 
       if (response.success) {
-        logger.debug(
-          "Recording started successfully, setting state to recording"
-        )
         setState("recording")
         setStepCount(0)
+        toast.success("Recording started!")
       } else {
-        // Show user-friendly error
-        const errorMsg = response.error || "Failed to start recording"
-        logger.debug("Failed to start recording", {
-          error: errorMsg,
-        })
-        alert(`Error: ${errorMsg}`)
+        toast.error(response.error || "Failed to start recording")
       }
     } catch (error) {
       logError(error)
@@ -264,11 +214,11 @@ function Popup() {
         errorMsg.includes("Receiving end does not exist") ||
         errorMsg.includes("Could not establish connection")
       ) {
-        alert(
+        toast.error(
           "Content script not loaded. Please refresh the page and try again."
         )
       } else {
-        alert("Failed to start recording. Please try again.")
+        toast.error("Failed to start recording. Please try again.")
       }
     } finally {
       setIsLoading(false)
@@ -290,37 +240,76 @@ function Popup() {
           setFlowName("New Flow")
           setShowSaveDialog(true)
         } else {
-          alert("No steps recorded. Please record at least one step.")
+          toast.error("No steps recorded. Please record at least one step.")
           setState("idle")
         }
       } else {
-        alert(response.error || "Failed to stop recording")
+        toast.error(response.error || "Failed to stop recording")
       }
     } catch (error) {
       logError(error)
-      alert("Failed to stop recording. Please try again.")
+      toast.error("Failed to stop recording. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleSaveFlow = async () => {
-    if (!flowName.trim()) {
-      alert("Please enter a flow name")
+    const trimmedName = flowName.trim()
+    if (!trimmedName) {
+      toast.error("Please enter a flow name")
+      return
+    }
+
+    if (trimmedName.length > UI_CONFIG.MAX_FLOW_NAME_LENGTH) {
+      toast.error(
+        `Flow name must be ${UI_CONFIG.MAX_FLOW_NAME_LENGTH} characters or less`
+      )
       return
     }
 
     setIsLoading(true)
     try {
-      await createFlow(flowName.trim(), pendingSteps)
+      const flow = await createFlow(trimmedName, pendingSteps)
+      await sendMessage({
+        type: "SAVE_FLOW",
+        flow,
+      } as SaveFlowMessage)
+
+      // If any steps have screenshots that need IndexedDB storage, save them
+      for (const step of pendingSteps) {
+        if (step.meta?.screenshotIndexedDB && step.meta?.screenshotFull) {
+          try {
+            // Convert data URL to Blob using dataUrlToBlob utility
+            const { dataUrlToBlob } = await import("~/utils/screenshot-capture")
+            const blob = dataUrlToBlob(step.meta.screenshotFull)
+            await sendMessage({
+              type: "SAVE_SCREENSHOT",
+              flowId: flow.id,
+              stepId: step.id,
+              screenshot: blob,
+            } as SaveScreenshotMessage)
+            // Clear the temporary full screenshot from meta
+            delete step.meta.screenshotFull
+          } catch (error) {
+            logError(error, {
+              context: "save-flow-screenshot",
+              flowId: flow.id,
+              stepId: step.id,
+            })
+          }
+        }
+      }
+
       await loadFlows()
       setShowSaveDialog(false)
       setFlowName("")
       setPendingSteps([])
       setState("idle")
+      toast.success(`Flow "${trimmedName}" saved successfully!`)
     } catch (error) {
       logError(error)
-      alert("Failed to save flow. Please try again.")
+      toast.error("Failed to save flow. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -358,193 +347,20 @@ function Popup() {
           setShowFlowDetails(false)
           setSelectedFlow(null)
         }
+        toast.success(`Flow "${flowName}" deleted successfully`)
       } else {
-        alert(response.error || "Failed to delete flow")
+        toast.error(response.error || "Failed to delete flow")
       }
     } catch (error) {
       logError(error)
-      alert("Failed to delete flow. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleStartPlayback = async (flowId: string) => {
-    setIsLoading(true)
-    try {
-      logger.debug("Starting playback for flow:", flowId)
-      console.warn("[Navio Popup] Chrome API available:", {
-        hasChrome: typeof chrome !== "undefined",
-        hasTabs: typeof chrome?.tabs !== "undefined",
-        hasQuery: typeof chrome?.tabs?.query === "function",
-      })
-
-      // Try to get active tab - use multiple strategies
-      let tabs: chrome.tabs.Tab[] = []
-      try {
-        tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-        logger.debug("Initial playback tab query result", {
-          tabsCount: tabs.length,
-          firstTabId: tabs[0]?.id,
-          firstTabUrl: tabs[0]?.url,
-          firstTabActive: tabs[0]?.active,
-        })
-      } catch (error) {
-        console.error("[Navio Popup] Error in initial tab query:", error)
-      }
-
-      // Fallback: if no active tab, try to get the current window's tabs
-      if (!tabs[0]?.id) {
-        logger.debug("No active tab found for playback, trying fallback query")
-        try {
-          tabs = await chrome.tabs.query({ currentWindow: true })
-          logger.debug("Fallback playback query result", {
-            tabsCount: tabs.length,
-            tabs: tabs.map((t) => ({
-              id: t.id,
-              url: t.url,
-              active: t.active,
-              title: t.title,
-            })),
-          })
-        } catch (error) {
-          console.error("[Navio Popup] Error in fallback tab query:", error)
-        }
-
-        // Get the first tab that's not a chrome:// page
-        const validTab = tabs.find(
-          (t) =>
-            t.id &&
-            t.url &&
-            !t.url.startsWith("chrome://") &&
-            !t.url.startsWith("chrome-extension://") &&
-            !t.url.startsWith("edge://")
-        )
-        if (validTab) {
-          logger.debug("Found valid tab for playback in fallback", {
-            id: validTab.id,
-            url: validTab.url,
-            title: validTab.title,
-          })
-          tabs = [validTab]
-        } else {
-          logger.debug("No valid tab found in fallback", {
-            allTabs: tabs.map((t) => ({
-              id: t.id,
-              url: t.url,
-              title: t.title,
-            })),
-          })
-        }
-      }
-
-      if (!tabs[0] || !tabs[0].id) {
-        logger.error("No valid tab found for playback", {
-          tabsCount: tabs.length,
-          allTabs: tabs.map((t) => ({
-            id: t.id,
-            url: t.url,
-            title: t.title,
-            active: t.active,
-          })),
-        })
-        alert(
-          "No active tab found. Please:\n" +
-            "1. Open a webpage in a tab\n" +
-            "2. Make sure the tab is not a chrome:// or chrome-extension:// page\n" +
-            "3. Try again"
-        )
-        setIsLoading(false)
-        return
-      }
-
-      const tab = tabs[0]
-      logger.debug("Selected tab for playback", {
-        id: tab.id,
-        url: tab.url,
-        title: tab.title,
-      })
-      if (
-        tab.url &&
-        (tab.url.startsWith("chrome://") ||
-          tab.url.startsWith("chrome-extension://"))
-      ) {
-        alert(
-          "Playback cannot start on this page. Please navigate to a regular website."
-        )
-        setIsLoading(false)
-        return
-      }
-
-      if (!tab.id) {
-        alert("Invalid tab")
-        setIsLoading(false)
-        return
-      }
-
-      const isReady = await ensureContentScriptReady(tab.id)
-      if (!isReady) {
-        const shouldRefresh = window.confirm(
-          "Content script not loaded.\n\nWould you like to refresh the page now?"
-        )
-        if (shouldRefresh && tab.id) {
-          await chrome.tabs.reload(tab.id)
-          await new Promise((resolve) => setTimeout(resolve, 1500))
-          const retryReady = await ensureContentScriptReady(tab.id)
-          if (!retryReady) {
-            alert("Please wait a moment, then try again.")
-            setIsLoading(false)
-            return
-          }
-        } else {
-          setIsLoading(false)
-          return
-        }
-      }
-
-      // Start playback
-      const response = await sendMessage({
-        type: "START_PLAYBACK",
-        flowId,
-      })
-
-      if (response.success) {
-        setState("playback")
-        logger.debug("Playback started", { flowId })
-      } else {
-        alert(response.error || "Failed to start playback")
-      }
-    } catch (error) {
-      logError(error)
-      alert("Failed to start playback. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleStopPlayback = async () => {
-    setIsLoading(true)
-    try {
-      const response = await sendMessage({
-        type: "STOP_PLAYBACK",
-      })
-
-      if (response.success) {
-        setState("idle")
-        logger.debug("Playback stopped")
-      } else {
-        alert(response.error || "Failed to stop playback")
-      }
-    } catch (error) {
-      logError(error)
-      alert("Failed to stop playback. Please try again.")
+      toast.error("Failed to delete flow. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="p-4 w-[360px]">
+    <div className="p-4 w-[400px]">
       <h2 className="m-0 mb-4 text-lg font-semibold">Navio</h2>
 
       {state === "idle" && (
@@ -575,19 +391,13 @@ function Popup() {
                       </p>
                       <div className="flex gap-2">
                         <Button
-                          onClick={() => handleStartPlayback(flow.id)}
-                          disabled={isLoading}
-                          size="sm"
-                          className="flex-1">
-                          Start Demo
-                        </Button>
-                        <Button
                           onClick={() => handleViewFlowDetails(flow)}
                           disabled={isLoading}
                           size="sm"
                           variant="outline"
-                          className="px-3">
-                          <Eye className="h-4 w-4" />
+                          className="flex-1">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
                         </Button>
                         <Button
                           onClick={() => handleDeleteFlow(flow.id, flow.name)}
@@ -623,24 +433,6 @@ function Popup() {
             size="default"
             className="w-full">
             {isLoading ? "Stopping..." : "Finish & Save Flow"}
-          </Button>
-        </div>
-      )}
-
-      {state === "playback" && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-sm font-medium">Playing Guided Demo</span>
-          </div>
-
-          <Button
-            onClick={handleStopPlayback}
-            disabled={isLoading}
-            variant="outline"
-            size="default"
-            className="w-full">
-            {isLoading ? "Stopping..." : "Stop Playback"}
           </Button>
         </div>
       )}
@@ -693,9 +485,7 @@ function Popup() {
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedFlow?.name || "Flow Details"}</DialogTitle>
-            <DialogDescription>
-              View step details including selectors and identifiers
-            </DialogDescription>
+            <DialogDescription>View step details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {selectedFlow && (
@@ -719,6 +509,14 @@ function Popup() {
                       <div
                         key={step.id}
                         className="border rounded-md p-3 space-y-2 bg-muted/30">
+                        {step.meta?.screenshotThumb && (
+                          <img
+                            src={step.meta.screenshotThumb}
+                            alt={`Step ${index + 1}`}
+                            className="w-full rounded border mb-2"
+                            style={{ maxHeight: "120px", objectFit: "contain" }}
+                          />
+                        )}
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
@@ -735,14 +533,6 @@ function Popup() {
                           </div>
                         </div>
                         <div className="space-y-1.5 pt-2 border-t">
-                          <div>
-                            <span className="text-xs font-medium text-muted-foreground">
-                              Selector:
-                            </span>
-                            <code className="block text-xs bg-background p-2 rounded mt-1 break-all font-mono">
-                              {step.selector || "(none)"}
-                            </code>
-                          </div>
                           <div>
                             <span className="text-xs font-medium text-muted-foreground">
                               URL:

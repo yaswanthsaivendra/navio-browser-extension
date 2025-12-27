@@ -4,12 +4,12 @@
  */
 
 import type { FlowStep } from "~/types/flows"
+import type { CaptureScreenshotMessage } from "~/types/messages"
 import { logError } from "~/utils/errors"
-import {
-  generateSelector,
-  getElementNodeType,
-  getElementText,
-} from "~/utils/selectors"
+import { logger } from "~/utils/logger"
+import { sendMessage } from "~/utils/messaging"
+import { captureAndProcessScreenshot } from "~/utils/screenshot-processing"
+import { getElementNodeType, getElementText } from "~/utils/selectors"
 import { createFlowStep } from "~/utils/storage"
 
 export interface RecorderConfig {
@@ -22,17 +22,32 @@ export class Recorder {
   private isPaused = false
   private clickHandler?: (event: MouseEvent) => void
   private config: RecorderConfig
+  private currentTabId?: number
+  private beforeUnloadHandler?: () => void
 
   constructor(config: RecorderConfig = {}) {
     this.config = config
+    // Set up cleanup on page unload
+    if (typeof window !== "undefined") {
+      this.beforeUnloadHandler = this.handleBeforeUnload.bind(this)
+      window.addEventListener("beforeunload", this.beforeUnloadHandler)
+    }
   }
 
   /**
    * Start recording
+   * @param tabId - Optional tab ID passed from background script
    */
-  start(): void {
+  async start(tabId?: number): Promise<void> {
     if (this.isRecording) {
       return
+    }
+
+    // Store tab ID if provided (content scripts can't use chrome.tabs API)
+    if (tabId) {
+      this.currentTabId = tabId
+    } else {
+      logger.warn("No tab ID provided - screenshots may not work")
     }
 
     this.isRecording = true
@@ -78,7 +93,6 @@ export class Recorder {
 
     const step = createFlowStep(
       "manual",
-      "", // No selector for manual steps
       window.location.href,
       explanation,
       0 // Order will be set by background
@@ -138,7 +152,6 @@ export class Recorder {
     element: Element,
     _event: MouseEvent
   ): Promise<void> {
-    const selectorResult = generateSelector(element)
     const elementText = getElementText(element)
     const nodeType = getElementNodeType(element)
     const url = window.location.href
@@ -146,15 +159,64 @@ export class Recorder {
     // Auto-generate explanation from element (max 100 characters)
     const explanation = this.generateStepExplanation(element, elementText)
 
+    // Always capture screenshot (screenshot-based recording is the only mode)
+    let screenshotData:
+      | {
+          screenshotThumb?: string
+          screenshotFull?: string
+          screenshotIndexedDB?: boolean
+        }
+      | undefined
+
+    // Use stored tab ID (content scripts can't use chrome.tabs API)
+    const tabId = this.currentTabId
+
+    if (tabId) {
+      try {
+        // Request raw screenshot from background script (content scripts can't use chrome.tabs API)
+        const response = await sendMessage({
+          type: "CAPTURE_SCREENSHOT",
+          tabId,
+        } as CaptureScreenshotMessage)
+
+        if (response.success && response.data) {
+          const data = response.data as { rawDataUrl: string }
+          // Process screenshot in content script (has DOM access for Image/Canvas)
+          const screenshot = await captureAndProcessScreenshot(data.rawDataUrl)
+          screenshotData = {
+            screenshotThumb: screenshot.thumbnail,
+            screenshotFull: screenshot.full,
+            screenshotIndexedDB: screenshot.indexedDB,
+          }
+
+          // Note: If screenshot.indexedDB is true, the full screenshot will be stored
+          // in IndexedDB when the flow is saved. For now, we store the full data URL
+          // temporarily in meta if it's available (for screenshots <200KB, full is included)
+        } else {
+          logger.warn("Screenshot capture failed", {
+            error: response.error,
+            tabId,
+            url,
+          })
+        }
+      } catch (error) {
+        logError(error, { context: "capture-click-screenshot", tabId })
+        logger.warn("Failed to capture screenshot", { error, tabId, url })
+        // Continue without screenshot if capture fails
+      }
+    } else {
+      logger.warn("No tab ID available for screenshot capture", { url })
+    }
+
     const step = createFlowStep(
       "click",
-      selectorResult.selector,
       url,
       explanation,
       0, // Order will be set by background script
       {
         elementText,
         nodeType,
+        ...screenshotData,
       }
     )
 
@@ -179,11 +241,12 @@ export class Recorder {
     else if (element instanceof HTMLAnchorElement || element.tagName === "A") {
       explanation = text ? `Click ${text}` : "Click link"
     }
-    // Try to use input label
+    // Try to use input placeholder or type
     else if (element instanceof HTMLInputElement) {
-      const label = this.findLabelForInput(element)
-      if (label) {
-        explanation = `Click ${label}`
+      if (element.placeholder) {
+        explanation = `Click ${element.placeholder}`
+      } else if (element.type) {
+        explanation = `Click ${element.type} input`
       } else {
         explanation = "Click input"
       }
@@ -197,49 +260,32 @@ export class Recorder {
       explanation = `Click ${element.tagName.toLowerCase()}`
     }
 
-    // Limit to 100 characters
-    if (explanation.length > 100) {
-      explanation = explanation.substring(0, 97) + "..."
+    // Limit to 200 characters (per UI_CONFIG.MAX_EXPLANATION_LENGTH)
+    const MAX_LENGTH = 200
+    if (explanation.length > MAX_LENGTH) {
+      explanation = explanation.substring(0, MAX_LENGTH - 3) + "..."
     }
 
     return explanation
   }
 
   /**
-   * Find label for an input element
+   * Handle page unload - cleanup resources
    */
-  private findLabelForInput(input: HTMLInputElement): string | null {
-    // Try id -> label[for]
-    if (input.id) {
-      const label = document.querySelector(`label[for="${input.id}"]`)
-      if (label) {
-        return label.textContent?.trim() || null
-      }
-    }
-
-    // Try parent label
-    const parentLabel = input.closest("label")
-    if (parentLabel) {
-      return parentLabel.textContent?.trim() || null
-    }
-
-    // Try aria-label
-    if (input.getAttribute("aria-label")) {
-      return input.getAttribute("aria-label")
-    }
-
-    // Try placeholder
-    if (input.placeholder) {
-      return input.placeholder
-    }
-
-    return null
+  private handleBeforeUnload(): void {
+    this.destroy()
   }
 
   /**
-   * Cleanup
+   * Cleanup all resources
    */
   destroy(): void {
     this.stop()
+
+    // Remove beforeunload listener
+    if (typeof window !== "undefined" && this.beforeUnloadHandler) {
+      window.removeEventListener("beforeunload", this.beforeUnloadHandler)
+      this.beforeUnloadHandler = undefined
+    }
   }
 }

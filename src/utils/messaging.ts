@@ -3,10 +3,10 @@
  * Handles communication between popup, background, and content scripts
  */
 
+import { RECORDING_CONFIG } from "~/constants"
 import type { Message, MessageResponse } from "~/types/messages"
 
 import { logError } from "./errors"
-import { logger } from "./logger"
 
 /**
  * Send a message and wait for response
@@ -30,99 +30,6 @@ export async function sendMessage<T = unknown>(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
-}
-
-/**
- * Send a message to the current active tab
- */
-export async function sendMessageToActiveTab<T = unknown>(
-  message: Message
-): Promise<MessageResponse<T>> {
-  try {
-    // Check if chrome.tabs is available
-    if (typeof chrome === "undefined" || !chrome.tabs) {
-      return {
-        success: false,
-        error: "chrome.tabs API is not available",
-      }
-    }
-
-    // Try to get active tab - use multiple strategies
-    let tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-
-    logger.debug("Initial tab query", {
-      tabsCount: tabs.length,
-      firstTabId: tabs[0]?.id,
-      firstTabUrl: tabs[0]?.url,
-    })
-
-    // Fallback: if no active tab, try to get the current window's tabs
-    if (!tabs[0]?.id) {
-      logger.debug("No active tab found, trying fallback query")
-      tabs = await chrome.tabs.query({ currentWindow: true })
-      logger.debug("Fallback query result", {
-        tabsCount: tabs.length,
-        tabs: tabs.map((t) => ({ id: t.id, url: t.url, active: t.active })),
-      })
-      // Get the first tab that's not a chrome:// page
-      const validTab = tabs.find(
-        (t) =>
-          t.id &&
-          t.url &&
-          !t.url.startsWith("chrome://") &&
-          !t.url.startsWith("chrome-extension://")
-      )
-      if (validTab) {
-        logger.debug("Found valid tab in fallback", {
-          id: validTab.id,
-          url: validTab.url,
-        })
-        tabs = [validTab]
-      }
-    }
-
-    const tab = tabs[0]
-    if (!tab || !tab.id) {
-      logger.error("No valid tab found", {
-        tabsCount: tabs.length,
-        allTabs: tabs.map((t) => ({ id: t.id, url: t.url })),
-      })
-      return {
-        success: false,
-        error: "No active tab found. Please open a webpage first.",
-      }
-    }
-
-    // Check if tab URL is accessible (not chrome:// or chrome-extension://)
-    if (
-      tab.url &&
-      (tab.url.startsWith("chrome://") ||
-        tab.url.startsWith("chrome-extension://"))
-    ) {
-      return {
-        success: false,
-        error: "Content scripts cannot run on this page",
-      }
-    }
-
-    return sendMessage<T>(message, tab.id)
-  } catch (error) {
-    // Don't log "Receiving end does not exist" as error - it's expected when content script isn't loaded
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error"
-    if (!errorMessage.includes("Receiving end does not exist")) {
-      logError(error, {
-        context: "send-message-active-tab",
-        message: message.type,
-      })
-    }
-    return {
-      success: false,
-      error: errorMessage.includes("Receiving end does not exist")
-        ? "Content script not loaded on this page"
-        : errorMessage,
     }
   }
 }
@@ -155,21 +62,6 @@ export function onMessage(
       }
     }
   )
-}
-
-/**
- * Broadcast message to all tabs
- */
-export async function broadcastMessage(message: Message): Promise<void> {
-  try {
-    const tabs = await chrome.tabs.query({})
-    const promises = tabs
-      .filter((tab) => tab.id !== undefined)
-      .map((tab) => sendMessage(message, tab.id).catch(() => null))
-    await Promise.all(promises)
-  } catch (error) {
-    logError(error, { context: "broadcast-message", message: message.type })
-  }
 }
 
 /**
@@ -296,9 +188,9 @@ export async function ensureContentScriptReady(
  */
 async function retryContentScriptCheck(
   tabId: number,
-  maxRetries: number = 3
+  maxRetries: number = RECORDING_CONFIG.MAX_RETRIES
 ): Promise<boolean> {
-  const delays = [200, 500, 1000] // Exponential backoff delays in ms
+  const delays = RECORDING_CONFIG.CONTENT_SCRIPT_RETRY_DELAYS
 
   for (let i = 0; i < maxRetries; i++) {
     if (await isContentScriptReady(tabId)) {
