@@ -14,9 +14,7 @@ export type MessageType =
   | "ADD_MANUAL_STEP"
   | "UNDO_LAST_STEP"
   | "GET_RECORDING_STATE"
-  | "GET_FLOWS"
   | "SAVE_FLOW"
-  | "DELETE_FLOW"
   | "EXPORT_FLOW"
   | "IMPORT_FLOW"
   | "SAVE_SCREENSHOT"
@@ -77,18 +75,9 @@ export interface GetRecordingStateMessage extends BaseMessage {
   type: "GET_RECORDING_STATE"
 }
 
-export interface GetFlowsMessage extends BaseMessage {
-  type: "GET_FLOWS"
-}
-
 export interface SaveFlowMessage extends BaseMessage {
   type: "SAVE_FLOW"
   flow: Flow
-}
-
-export interface DeleteFlowMessage extends BaseMessage {
-  type: "DELETE_FLOW"
-  flowId: string
 }
 
 export interface ExportFlowMessage extends BaseMessage {
@@ -130,9 +119,7 @@ export type Message =
   | AddManualStepMessage
   | UndoLastStepMessage
   | GetRecordingStateMessage
-  | GetFlowsMessage
   | SaveFlowMessage
-  | DeleteFlowMessage
   | ExportFlowMessage
   | ImportFlowMessage
   | SaveScreenshotMessage

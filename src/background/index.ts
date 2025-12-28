@@ -7,15 +7,14 @@ import type {
   StartRecordingMessage,
 } from "~/types/messages"
 import type { RecordingSession } from "~/types/recording"
+import { initializeAuth } from "~/utils/auth/auth-manager"
 import { logError } from "~/utils/errors"
 import { deleteScreenshots, saveScreenshot } from "~/utils/indexeddb"
 import { logger } from "~/utils/logger"
 import { onMessage } from "~/utils/messaging"
 import { dataUrlToBlob } from "~/utils/screenshot-capture"
 import {
-  deleteFlow,
   exportFlowToJSON,
-  getAllFlows,
   getFlowById,
   importFlowFromJSON,
   saveFlow,
@@ -99,9 +98,18 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 })
 
-// Handle errors
+// Handle extension startup
 chrome.runtime.onStartup.addListener(() => {
   logger.info("Extension started")
+  // Initialize authentication (silent, background operation)
+  initializeAuth().catch((error) => {
+    logError(error, { context: "auth-initialization-on-startup" })
+  })
+})
+
+// Initialize authentication on background script load
+initializeAuth().catch((error) => {
+  logError(error, { context: "auth-initialization-on-load" })
 })
 
 // Error handling for unhandled errors
@@ -122,34 +130,9 @@ onMessage(async (message: Message, sender): Promise<MessageResponse> => {
   try {
     switch (message.type) {
       // Flow management
-      case "GET_FLOWS": {
-        const flows = await getAllFlows()
-        return { success: true, data: flows }
-      }
-
       case "SAVE_FLOW": {
         const saved = await saveFlow(message.flow)
         return { success: saved, data: message.flow }
-      }
-
-      case "DELETE_FLOW": {
-        const deleted = await deleteFlow(message.flowId)
-        // Also delete associated screenshots from IndexedDB
-        if (deleted) {
-          try {
-            await deleteScreenshots(message.flowId)
-            logger.debug("Deleted screenshots for flow", {
-              flowId: message.flowId,
-            })
-          } catch (error) {
-            logError(error, {
-              context: "delete-flow-screenshots",
-              flowId: message.flowId,
-            })
-            // Don't fail the delete if screenshot cleanup fails
-          }
-        }
-        return { success: deleted }
       }
 
       case "SAVE_SCREENSHOT": {

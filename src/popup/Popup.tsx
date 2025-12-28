@@ -1,8 +1,10 @@
-import { Eye, Trash2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 
+import { createFlow as createFlowViaAPI } from "~/api/flows"
+import { AuthStatus } from "~/components/AuthStatus"
+import { LoginScreen } from "~/components/LoginScreen"
 import { Button } from "~/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -14,32 +16,61 @@ import {
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import { RECORDING_CONFIG, UI_CONFIG } from "~/constants"
-import type { Flow, FlowStep } from "~/types/flows"
-import type {
-  SaveFlowMessage,
-  SaveScreenshotMessage,
-  StartRecordingMessage,
-} from "~/types/messages"
-import { logError } from "~/utils/errors"
+import type { FlowStep } from "~/types/flows"
+import type { StartRecordingMessage } from "~/types/messages"
+import { handleApiError, logError } from "~/utils/errors"
 import { ensureContentScriptReady, sendMessage } from "~/utils/messaging"
-import { createFlow, getAllFlows } from "~/utils/storage"
+import { createFlow as createLocalFlow } from "~/utils/storage"
 
 type PopupState = "idle" | "recording"
 
 function Popup() {
+  const [authStatus, setAuthStatus] = useState<
+    "checking" | "authenticated" | "unauthenticated"
+  >("checking")
   const [state, setState] = useState<PopupState>("idle")
-  const [flows, setFlows] = useState<Flow[]>([])
   const [stepCount, setStepCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [flowName, setFlowName] = useState("")
   const [pendingSteps, setPendingSteps] = useState<FlowStep[]>([])
-  const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null)
-  const [showFlowDetails, setShowFlowDetails] = useState(false)
 
-  const loadFlows = async () => {
-    const loadedFlows = await getAllFlows()
-    setFlows(loadedFlows)
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { checkAuthAndPrompt } = await import("~/utils/auth/auth-manager")
+        const { isTokenValid } = await import("~/utils/auth-storage")
+
+        // Fast path: Check local token first
+        const hasValidToken = await isTokenValid()
+        if (hasValidToken) {
+          setAuthStatus("authenticated")
+          return
+        }
+
+        // Check with server
+        const isAuthenticated = await checkAuthAndPrompt()
+        setAuthStatus(isAuthenticated ? "authenticated" : "unauthenticated")
+      } catch (error) {
+        logError(error, { context: "popup-auth-check" })
+        setAuthStatus("unauthenticated")
+      }
+    }
+
+    checkAuth()
+  }, [])
+
+  const handleLoginSuccess = async () => {
+    // Recheck auth status after login
+    try {
+      const { checkAuthAndPrompt } = await import("~/utils/auth/auth-manager")
+      const isAuthenticated = await checkAuthAndPrompt()
+      setAuthStatus(isAuthenticated ? "authenticated" : "unauthenticated")
+    } catch (error) {
+      logError(error, { context: "popup-login-success" })
+      setAuthStatus("unauthenticated")
+    }
   }
 
   const checkRecordingState = useCallback(async () => {
@@ -66,8 +97,10 @@ function Popup() {
     }
   }, [state])
 
-  // Load flows and check recording state on mount
+  // Load flows and check recording state on mount (only if authenticated)
   useEffect(() => {
+    if (authStatus !== "authenticated") return
+
     // Check if chrome.storage is available before loading
     const checkAndLoad = async () => {
       if (
@@ -75,7 +108,6 @@ function Popup() {
         chrome.storage &&
         chrome.storage.local
       ) {
-        await loadFlows()
         // Check recording state on mount to restore UI state
         await checkRecordingState()
       } else {
@@ -86,7 +118,6 @@ function Popup() {
             chrome.storage &&
             chrome.storage.local
           ) {
-            await loadFlows()
             // Check recording state after retry
             await checkRecordingState()
           }
@@ -94,7 +125,7 @@ function Popup() {
       }
     }
     checkAndLoad()
-  }, [checkRecordingState])
+  }, [checkRecordingState, authStatus])
 
   // Poll for recording state (only when recording)
   useEffect(() => {
@@ -229,7 +260,7 @@ function Popup() {
         type: "STOP_RECORDING",
       })
       if (response.success && response.data) {
-        const steps = (response.data as { steps: Flow["steps"] }).steps
+        const steps = (response.data as { steps: FlowStep[] }).steps
         if (steps.length > 0) {
           // Store steps and open dialog
           setPendingSteps(steps)
@@ -266,47 +297,25 @@ function Popup() {
 
     setIsLoading(true)
     try {
-      const flow = await createFlow(trimmedName, pendingSteps)
-      await sendMessage({
-        type: "SAVE_FLOW",
-        flow,
-      } as SaveFlowMessage)
+      // Create local flow object (temporary, just for structure)
+      const flow = await createLocalFlow(trimmedName, pendingSteps)
 
-      // If any steps have screenshots that need IndexedDB storage, save them
-      for (const step of pendingSteps) {
-        if (step.meta?.screenshotIndexedDB && step.meta?.screenshotFull) {
-          try {
-            // Convert data URL to Blob using dataUrlToBlob utility
-            const { dataUrlToBlob } = await import(
-              "~/utils/screenshot-processing"
-            )
-            const blob = dataUrlToBlob(step.meta.screenshotFull)
-            await sendMessage({
-              type: "SAVE_SCREENSHOT",
-              flowId: flow.id,
-              stepId: step.id,
-              screenshot: blob,
-            } as SaveScreenshotMessage)
-            // Clear the temporary full screenshot from meta
-            delete step.meta.screenshotFull
-          } catch (error) {
-            logError(error, {
-              context: "save-flow-screenshot",
-              flowId: flow.id,
-              stepId: step.id,
-            })
-          }
-        }
-      }
+      // Send flow to API
+      await createFlowViaAPI(flow)
 
-      await loadFlows()
+      // Success! Clear local data and reset UI
       setShowSaveDialog(false)
       setFlowName("")
       setPendingSteps([])
       setState("idle")
+
+      // Show success message (could be replaced with a toast in the future)
+      // For now, just reset to idle state - user can see the dialog closed
     } catch (error) {
-      logError(error)
-      alert("Failed to save flow. Please try again.")
+      logError(error, { context: "handle-save-flow" })
+      const errorMessage = handleApiError(error)
+      alert(errorMessage)
+      // Keep dialog open on error so user can retry
     } finally {
       setIsLoading(false)
     }
@@ -319,119 +328,71 @@ function Popup() {
     setState("idle")
   }
 
-  const handleViewFlowDetails = (flow: Flow) => {
-    setSelectedFlow(flow)
-    setShowFlowDetails(true)
-  }
-
-  const handleDeleteFlow = async (flowId: string, flowName: string) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${flowName}"?\n\nThis action cannot be undone.`
+  // Show login screen if not authenticated
+  if (authStatus === "checking") {
+    return (
+      <div className="w-[420px] min-h-[500px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
     )
-    if (!confirmed) return
-
-    setIsLoading(true)
-    try {
-      const response = await sendMessage({
-        type: "DELETE_FLOW",
-        flowId,
-      })
-
-      if (response.success) {
-        await loadFlows()
-        // Close details dialog if viewing the deleted flow
-        if (selectedFlow?.id === flowId) {
-          setShowFlowDetails(false)
-          setSelectedFlow(null)
-        }
-      } else {
-        alert(response.error || "Failed to delete flow")
-      }
-    } catch (error) {
-      logError(error)
-      alert("Failed to delete flow. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
   }
 
+  if (authStatus === "unauthenticated") {
+    return (
+      <div className="w-[420px] min-h-[500px]">
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      </div>
+    )
+  }
+
+  // Authenticated - show main UI
   return (
-    <div className="p-4 w-[360px]">
-      <h2 className="m-0 mb-4 text-lg font-semibold">Navio</h2>
-
-      {state === "idle" && (
-        <div className="flex flex-col gap-2">
-          <Button
-            onClick={handleStartRecording}
-            disabled={isLoading}
-            size="default"
-            className="w-full">
-            {isLoading ? "Starting..." : "Start Recording"}
-          </Button>
-
-          {flows.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-sm font-medium mb-2 text-muted-foreground">
-                Saved Flows ({flows.length})
-              </h3>
-              <div className="flex flex-col gap-2">
-                {flows.map((flow) => (
-                  <Card key={flow.id}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">{flow.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 space-y-2">
-                      <p className="text-xs text-muted-foreground">
-                        {flow.steps.length} step
-                        {flow.steps.length !== 1 ? "s" : ""}
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => handleViewFlowDetails(flow)}
-                          disabled={isLoading}
-                          size="sm"
-                          variant="outline"
-                          className="flex-1">
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </Button>
-                        <Button
-                          onClick={() => handleDeleteFlow(flow.id, flow.name)}
-                          disabled={isLoading}
-                          size="sm"
-                          variant="outline"
-                          className="px-3 text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
+    <div className="p-4 w-[420px] min-h-[500px] flex flex-col">
+      {/* Header with title and auth status */}
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <h2 className="m-0 text-lg font-semibold">Navio</h2>
+        <div className="shrink-0">
+          <AuthStatus />
         </div>
-      )}
+      </div>
 
-      {state === "recording" && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-            <span className="text-sm font-medium">
-              Recording... Step {stepCount}
-            </span>
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto">
+        {state === "idle" && (
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={handleStartRecording}
+              disabled={isLoading}
+              size="default"
+              className="w-full">
+              {isLoading ? "Starting..." : "Start Recording"}
+            </Button>
           </div>
+        )}
 
-          <Button
-            onClick={handleStopRecording}
-            disabled={isLoading}
-            variant="destructive"
-            size="default"
-            className="w-full">
-            {isLoading ? "Stopping..." : "Finish & Save Flow"}
-          </Button>
-        </div>
-      )}
+        {state === "recording" && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+              <span className="text-sm font-medium">
+                Recording... Step {stepCount}
+              </span>
+            </div>
+
+            <Button
+              onClick={handleStopRecording}
+              disabled={isLoading}
+              variant="destructive"
+              size="default"
+              className="w-full">
+              {isLoading ? "Stopping..." : "Finish & Save Flow"}
+            </Button>
+          </div>
+        )}
+      </div>
 
       <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
         <DialogContent className="sm:max-w-[425px]">
@@ -471,120 +432,6 @@ function Popup() {
               onClick={handleSaveFlow}
               disabled={isLoading || !flowName.trim()}>
               {isLoading ? "Saving..." : "Save Flow"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Flow Details Dialog */}
-      <Dialog open={showFlowDetails} onOpenChange={setShowFlowDetails}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedFlow?.name || "Flow Details"}</DialogTitle>
-            <DialogDescription>View step details</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {selectedFlow && (
-              <>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      Total Steps: {selectedFlow.steps.length}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Created:{" "}
-                      {new Date(selectedFlow.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold">Steps:</h4>
-                  {selectedFlow.steps
-                    .sort((a, b) => a.order - b.order)
-                    .map((step, index) => (
-                      <div
-                        key={step.id}
-                        className="border rounded-md p-3 space-y-2 bg-muted/30">
-                        {step.meta?.screenshotThumb && (
-                          <img
-                            src={step.meta.screenshotThumb}
-                            alt={`Step ${index + 1}`}
-                            className="w-full rounded border mb-2"
-                            style={{ maxHeight: "120px", objectFit: "contain" }}
-                          />
-                        )}
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-semibold text-primary">
-                                Step {index + 1}
-                              </span>
-                              <span className="text-xs px-2 py-0.5 rounded bg-background border text-muted-foreground">
-                                {step.type}
-                              </span>
-                            </div>
-                            <p className="text-sm font-medium text-foreground">
-                              {step.explanation}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5 pt-2 border-t">
-                          <div>
-                            <span className="text-xs font-medium text-muted-foreground">
-                              URL:
-                            </span>
-                            <p className="text-xs text-muted-foreground mt-1 break-all">
-                              {step.url}
-                            </p>
-                          </div>
-                          {step.meta?.elementText && (
-                            <div>
-                              <span className="text-xs font-medium text-muted-foreground">
-                                Element Text:
-                              </span>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {step.meta.elementText}
-                              </p>
-                            </div>
-                          )}
-                          {step.meta?.nodeType && (
-                            <div>
-                              <span className="text-xs font-medium text-muted-foreground">
-                                Node Type:
-                              </span>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {step.meta.nodeType}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            {selectedFlow && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => {
-                  handleDeleteFlow(selectedFlow.id, selectedFlow.name)
-                }}
-                disabled={isLoading}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Flow
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowFlowDetails(false)
-                setSelectedFlow(null)
-              }}>
-              Close
             </Button>
           </DialogFooter>
         </DialogContent>

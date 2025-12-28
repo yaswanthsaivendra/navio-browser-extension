@@ -70,3 +70,19 @@ export const UI_CONFIG = {
   /** Minimum length for step explanations */
   MIN_EXPLANATION_LENGTH: 1,
 } as const
+
+/**
+ * Authentication configuration
+ */
+export const AUTH_CONFIG = {
+  /** Storage key for JWT token */
+  TOKEN_KEY: "navio_extension_token",
+  /** Storage key for token expiry timestamp */
+  TOKEN_EXPIRY_KEY: "navio_token_expires_at",
+  /** Storage key for tenant ID */
+  TENANT_ID_KEY: "navio_tenant_id",
+  /** Storage key for tenant name */
+  TENANT_NAME_KEY: "navio_tenant_name",
+  /** Token refresh threshold in milliseconds (5 minutes before expiry) */
+  TOKEN_REFRESH_THRESHOLD_MS: 5 * 60 * 1000,
+} as const

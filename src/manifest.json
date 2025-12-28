@@ -4,7 +4,10 @@
   "version": "0.0.1",
   "description": "Browser extension for recording demo flows using screenshot-based recording",
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
-  "optional_host_permissions": ["https://*/*"],
+  "host_permissions": [
+    "https://your-app.vercel.app/*",
+    "http://localhost:3000/*"
+  ],
   "action": {
     "default_popup": "src/popup/index.html",
     "default_icon": {
